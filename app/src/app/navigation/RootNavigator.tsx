@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../state/AuthContext";
 import LoginScreen from "../screens/auth/LoginScreen";
-import MainTabs from "./MainTabs";
+import MainStack from "./MainStack";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -27,7 +27,7 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Main" component={MainStack} />
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
