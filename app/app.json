@@ -16,6 +16,19 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.sentinel.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.955222797662-drmbh6dbtm4go4gm0u1iubmibud80eik"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
