@@ -176,45 +176,33 @@ export const resolveDayLimits = (settings: UserSettingsDto | undefined, date: st
   const safeSettings = settings || {};
   const overallBase = defaultOverall(safeSettings);
 
-  const defaultMealRatios = {
-    BREAKFAST: 0.30,
-    LUNCH: 0.35,
-    DINNER: 0.30,
-    SNACKS: 0.05,
-  };
-
-  const fallbackMealCalories = {
-    BREAKFAST: Math.round(overallBase.calories * defaultMealRatios.BREAKFAST),
-    LUNCH: Math.round(overallBase.calories * defaultMealRatios.LUNCH),
-    DINNER: Math.round(overallBase.calories * defaultMealRatios.DINNER),
-    SNACKS: Math.max(0, Math.round(overallBase.calories * defaultMealRatios.SNACKS)),
-  };
-
   const perDay = parsePerDay(safeSettings.perDayCalorieLimits);
   const dayKey = dayjs(date).format("dddd");
   const dayConfig = perDay?.[dayKey];
 
-  if (!dayConfig?.overall) {
-    return {
-      overall: overallBase,
-      mealCalories: fallbackMealCalories,
-    };
-  }
+  const overall: MacroLimits = dayConfig?.overall
+    ? {
+        calories: dayConfig.overall.calories ?? overallBase.calories,
+        protein: dayConfig.overall.protein ?? overallBase.protein,
+        carbs: dayConfig.overall.carbs ?? overallBase.carbs,
+        fats: dayConfig.overall.fats ?? overallBase.fats,
+      }
+    : overallBase;
 
-  const overall: MacroLimits = {
-    calories: dayConfig.overall.calories ?? overallBase.calories,
-    protein: dayConfig.overall.protein ?? overallBase.protein,
-    carbs: dayConfig.overall.carbs ?? overallBase.carbs,
-    fats: dayConfig.overall.fats ?? overallBase.fats,
+  const fallback = {
+    BREAKFAST: Math.round(overall.calories * 0.30),
+    LUNCH: Math.round(overall.calories * 0.35),
+    DINNER: Math.round(overall.calories * 0.30),
+    SNACKS: Math.max(0, Math.round(overall.calories * 0.05)),
   };
 
   return {
     overall,
     mealCalories: {
-      BREAKFAST: Math.round(dayConfig.meals?.breakfast?.calories ?? fallbackMealCalories.BREAKFAST),
-      LUNCH: Math.round(dayConfig.meals?.lunch?.calories ?? fallbackMealCalories.LUNCH),
-      DINNER: Math.round(dayConfig.meals?.dinner?.calories ?? fallbackMealCalories.DINNER),
-      SNACKS: Math.round(dayConfig.meals?.snacks?.calories ?? fallbackMealCalories.SNACKS),
+      BREAKFAST: dayConfig?.meals?.breakfast?.calories != null ? Math.round(dayConfig.meals.breakfast.calories) : fallback.BREAKFAST,
+      LUNCH: dayConfig?.meals?.lunch?.calories != null ? Math.round(dayConfig.meals.lunch.calories) : fallback.LUNCH,
+      DINNER: dayConfig?.meals?.dinner?.calories != null ? Math.round(dayConfig.meals.dinner.calories) : fallback.DINNER,
+      SNACKS: dayConfig?.meals?.snacks?.calories != null ? Math.round(dayConfig.meals.snacks.calories) : fallback.SNACKS,
     },
   };
 };

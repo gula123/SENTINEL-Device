@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import {
@@ -11,6 +11,30 @@ import {
 } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
 
+function MacroInput({ label, value, onChange }: { label: string; value: number; onChange: (v: string) => void }) {
+  return (
+    <View style={{ flex: 1, gap: 4 }}>
+      <Text style={{ fontSize: 10, fontWeight: "600", color: "#6b7280", textAlign: "center" }}>{label}</Text>
+      <TextInput
+        value={String(Math.round(value))}
+        onChangeText={onChange}
+        keyboardType="numeric"
+        style={{
+          borderWidth: 1,
+          borderColor: "#d1fae5",
+          borderRadius: 10,
+          backgroundColor: "#f8fdfb",
+          paddingHorizontal: 6,
+          paddingVertical: 8,
+          fontSize: 13,
+          color: "#111827",
+          textAlign: "center",
+        }}
+      />
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
@@ -20,10 +44,6 @@ export default function SettingsScreen() {
   const [name, setName] = useState("User");
   const [email, setEmail] = useState("user@example.com");
   const [targetWeight, setTargetWeight] = useState("");
-  const [dailyCalorieLimit, setDailyCalorieLimit] = useState("2000");
-  const [dailyProteinLimit, setDailyProteinLimit] = useState("150");
-  const [dailyCarbsLimit, setDailyCarbsLimit] = useState("250");
-  const [dailyFatsLimit, setDailyFatsLimit] = useState("65");
   const [perDay, setPerDay] = useState<PerDayLimitsResolved | null>(null);
 
   useEffect(() => {
@@ -34,10 +54,6 @@ export default function SettingsScreen() {
     setName(settingsQuery.data.name || "User");
     setEmail(settingsQuery.data.email || "user@example.com");
     setTargetWeight(settingsQuery.data.targetWeight != null ? String(settingsQuery.data.targetWeight) : "");
-    setDailyCalorieLimit(String(Math.round(settingsQuery.data.dailyCalorieLimit ?? 2000)));
-    setDailyProteinLimit(String(Math.round(settingsQuery.data.dailyProteinLimit ?? 150)));
-    setDailyCarbsLimit(String(Math.round(settingsQuery.data.dailyCarbsLimit ?? 250)));
-    setDailyFatsLimit(String(Math.round(settingsQuery.data.dailyFatsLimit ?? 65)));
     setPerDay(resolvePerDayLimitsForEdit(settingsQuery.data));
   }, [settingsQuery.data]);
 
@@ -47,25 +63,17 @@ export default function SettingsScreen() {
         throw new Error("AUTH_REQUIRED");
       }
 
+      const mondayOverall = perDay.Monday?.overall;
       const payload = {
         name,
         email,
         targetWeight: targetWeight.trim() ? Number(targetWeight) : null,
-        dailyCalorieLimit: Number(dailyCalorieLimit),
-        dailyProteinLimit: Number(dailyProteinLimit),
-        dailyCarbsLimit: Number(dailyCarbsLimit),
-        dailyFatsLimit: Number(dailyFatsLimit),
+        dailyCalorieLimit: mondayOverall?.calories ?? 2000,
+        dailyProteinLimit: mondayOverall?.protein ?? 150,
+        dailyCarbsLimit: mondayOverall?.carbs ?? 250,
+        dailyFatsLimit: mondayOverall?.fats ?? 65,
         perDayCalorieLimits: perDay,
       };
-
-      if (
-        !Number.isFinite(payload.dailyCalorieLimit) ||
-        !Number.isFinite(payload.dailyProteinLimit) ||
-        !Number.isFinite(payload.dailyCarbsLimit) ||
-        !Number.isFinite(payload.dailyFatsLimit)
-      ) {
-        throw new Error("Daily limits must be valid numbers");
-      }
 
       return saveUserSettings(token, payload);
     },
@@ -92,11 +100,10 @@ export default function SettingsScreen() {
     });
   };
 
-  const updateMealCalories = (meal: "breakfast" | "lunch" | "dinner" | "snacks", value: string) => {
+  const updateMealMacro = (meal: "breakfast" | "lunch" | "dinner" | "snacks", field: keyof MacroLimits, value: string) => {
     if (!perDay) return;
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
-
     setPerDay({
       ...perDay,
       [selectedDay]: {
@@ -105,7 +112,7 @@ export default function SettingsScreen() {
           ...perDay[selectedDay].meals,
           [meal]: {
             ...perDay[selectedDay].meals[meal],
-            calories: parsed,
+            [field]: parsed,
           },
         },
       },
@@ -131,28 +138,28 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Settings</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.pageTitle}>Settings</Text>
 
         {settingsQuery.isLoading ? (
-          <View style={styles.statusBox}>
-            <ActivityIndicator size="small" color="#ef4444" />
-            <Text style={styles.statusText}>Loading settings...</Text>
+          <View style={styles.centerBox}>
+            <ActivityIndicator size="large" color="#16a34a" />
+            <Text style={styles.loadingText}>Loading settings…</Text>
           </View>
         ) : null}
 
         {settingsQuery.isError ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Failed to load settings</Text>
-            <Text style={styles.errorText}>{isAuthExpired ? "Session expired." : (settingsQuery.error as Error).message}</Text>
-            <View style={styles.errorRow}>
+            <Text style={styles.errorText}>{isAuthExpired ? "Session expired. Please sign in again." : (settingsQuery.error as Error).message}</Text>
+            <View style={styles.row}>
               {isAuthExpired ? (
-                <Pressable onPress={signOut} style={styles.errorSecondaryButton}>
-                  <Text style={styles.errorSecondaryText}>Sign in again</Text>
+                <Pressable onPress={signOut} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
+                  <Text style={styles.secondaryBtnText}>Sign in again</Text>
                 </Pressable>
               ) : null}
-              <Pressable onPress={() => settingsQuery.refetch()} style={styles.errorPrimaryButton}>
-                <Text style={styles.errorPrimaryText}>Retry</Text>
+              <Pressable onPress={() => settingsQuery.refetch()} style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
+                <Text style={styles.primaryBtnText}>Retry</Text>
               </Pressable>
             </View>
           </View>
@@ -166,15 +173,8 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Daily Limits</Text>
-          <TextInput value={dailyCalorieLimit} onChangeText={setDailyCalorieLimit} placeholder="Calories" keyboardType="numeric" style={styles.input} />
-          <TextInput value={dailyProteinLimit} onChangeText={setDailyProteinLimit} placeholder="Protein (g)" keyboardType="numeric" style={styles.input} />
-          <TextInput value={dailyCarbsLimit} onChangeText={setDailyCarbsLimit} placeholder="Carbs (g)" keyboardType="numeric" style={styles.input} />
-          <TextInput value={dailyFatsLimit} onChangeText={setDailyFatsLimit} placeholder="Fats (g)" keyboardType="numeric" style={styles.input} />
-        </View>
-
-        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Per-Day Limits</Text>
+          <Text style={styles.hint}>Set nutrition targets for each day of the week. Select a day to edit its limits.</Text>
           <View style={styles.dayRow}>
             {DAYS_OF_WEEK.map((day) => (
               <Pressable key={day} onPress={() => setSelectedDay(day)} style={[styles.dayChip, selectedDay === day && styles.dayChipActive]}>
@@ -185,65 +185,28 @@ export default function SettingsScreen() {
 
           {dayData ? (
             <>
-              <Text style={styles.subTitle}>Overall ({selectedDay})</Text>
-              <TextInput
-                value={String(Math.round(dayData.overall.calories))}
-                onChangeText={(v) => updateDayOverall("calories", v)}
-                placeholder="Calories"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.overall.protein))}
-                onChangeText={(v) => updateDayOverall("protein", v)}
-                placeholder="Protein (g)"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.overall.carbs))}
-                onChangeText={(v) => updateDayOverall("carbs", v)}
-                placeholder="Carbs (g)"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.overall.fats))}
-                onChangeText={(v) => updateDayOverall("fats", v)}
-                placeholder="Fats (g)"
-                keyboardType="numeric"
-                style={styles.input}
-              />
+              <Text style={styles.subLabel}>📊 Daily Totals — {selectedDay}</Text>
+              <Text style={styles.hint}>Total daily targets. Used for calendar colour coding (green / yellow / red) and Quick Fill goal.</Text>
+              <View style={styles.macroRow}>
+                <MacroInput label="Cal" value={dayData.overall.calories} onChange={(v) => updateDayOverall("calories", v)} />
+                <MacroInput label="Protein g" value={dayData.overall.protein} onChange={(v) => updateDayOverall("protein", v)} />
+                <MacroInput label="Carbs g" value={dayData.overall.carbs} onChange={(v) => updateDayOverall("carbs", v)} />
+                <MacroInput label="Fats g" value={dayData.overall.fats} onChange={(v) => updateDayOverall("fats", v)} />
+              </View>
 
-              <Text style={styles.subTitle}>Meal Calories (used by Quick Fill)</Text>
-              <TextInput
-                value={String(Math.round(dayData.meals.breakfast.calories))}
-                onChangeText={(v) => updateMealCalories("breakfast", v)}
-                placeholder="Breakfast calories"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.meals.lunch.calories))}
-                onChangeText={(v) => updateMealCalories("lunch", v)}
-                placeholder="Lunch calories"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.meals.dinner.calories))}
-                onChangeText={(v) => updateMealCalories("dinner", v)}
-                placeholder="Dinner calories"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                value={String(Math.round(dayData.meals.snacks.calories))}
-                onChangeText={(v) => updateMealCalories("snacks", v)}
-                placeholder="Snacks calories"
-                keyboardType="numeric"
-                style={styles.input}
-              />
+              <Text style={styles.subLabel}>🍽 Per-Meal Targets</Text>
+              <Text style={styles.hint}>Meal-specific limits for diary progress bars and Quick Fill distribution across meals.</Text>
+              {(["breakfast", "lunch", "dinner", "snacks"] as const).map((meal) => (
+                <View key={meal} style={styles.mealSection}>
+                  <Text style={styles.mealLabel}>{meal[0].toUpperCase() + meal.slice(1)}</Text>
+                  <View style={styles.macroRow}>
+                    <MacroInput label="Cal" value={dayData.meals[meal].calories} onChange={(v) => updateMealMacro(meal, "calories", v)} />
+                    <MacroInput label="Protein g" value={dayData.meals[meal].protein} onChange={(v) => updateMealMacro(meal, "protein", v)} />
+                    <MacroInput label="Carbs g" value={dayData.meals[meal].carbs} onChange={(v) => updateMealMacro(meal, "carbs", v)} />
+                    <MacroInput label="Fats g" value={dayData.meals[meal].fats} onChange={(v) => updateMealMacro(meal, "fats", v)} />
+                  </View>
+                </View>
+              ))}
             </>
           ) : null}
         </View>
@@ -255,19 +218,21 @@ export default function SettingsScreen() {
           disabled={saveMutation.isPending || settingsQuery.isLoading || settingsQuery.isError}
           style={({ pressed }) => [
             styles.saveButton,
-            (pressed || saveMutation.isPending || settingsQuery.isLoading || settingsQuery.isError) && styles.buttonPressed,
+            (pressed || saveMutation.isPending || settingsQuery.isLoading || settingsQuery.isError) && styles.pressed,
           ]}
         >
-          <Text style={styles.saveButtonText}>{saveMutation.isPending ? "Saving..." : "Save Settings"}</Text>
+          {saveMutation.isPending
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={styles.saveButtonText}>Save Settings</Text>}
         </Pressable>
 
         <Pressable
           onPress={signOut}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}
         >
-          <Text style={styles.buttonText}>Sign out</Text>
+          <Text style={styles.signOutButtonText}>Sign out</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -275,89 +240,88 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fff" },
-  container: { padding: 20, gap: 12, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: "700", color: "#111827" },
-  card: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    backgroundColor: "#f9fafb",
-  },
-  statusBox: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  statusText: { color: "#374151", fontSize: 12 },
-  errorBox: {
-    backgroundColor: "#fef2f2",
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    borderRadius: 10,
-    padding: 10,
-    gap: 6,
-  },
+  safeArea: { flex: 1, backgroundColor: "#f8fdfb" },
+  scroll: { padding: 20, gap: 16, paddingBottom: Platform.OS === "web" ? 80 : 40 },
+
+  pageTitle: { fontSize: 24, fontWeight: "800", color: "#111827" },
+
+  // Loading / error
+  centerBox: { backgroundColor: "#f0fdf4", borderRadius: 16, padding: 24, alignItems: "center", gap: 10 },
+  loadingText: { fontSize: 14, color: "#4b5563" },
+  errorBox: { backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", borderRadius: 16, padding: 14, gap: 8 },
   errorTitle: { color: "#991b1b", fontWeight: "700" },
   errorText: { color: "#b91c1c", fontSize: 12 },
-  errorRow: { flexDirection: "row", gap: 8 },
-  errorPrimaryButton: {
-    backgroundColor: "#ef4444",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  errorPrimaryText: { color: "#fff", fontWeight: "700" },
-  errorSecondaryButton: {
+  row: { flexDirection: "row", gap: 8 },
+  primaryBtn: { backgroundColor: "#16a34a", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  primaryBtnText: { color: "#fff", fontWeight: "600" },
+  secondaryBtn: { borderWidth: 1, borderColor: "#fecaca", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  secondaryBtnText: { color: "#991b1b", fontWeight: "600" },
+  pressed: { opacity: 0.7 },
+
+  // Card
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    gap: 10,
     borderWidth: 1,
-    borderColor: "#fecaca",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: "#bbf7d0",
+    shadowColor: "#16a34a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  errorSecondaryText: { color: "#991b1b", fontWeight: "600" },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  subTitle: { marginTop: 4, fontSize: 13, color: "#374151", fontWeight: "600" },
+  sectionTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", letterSpacing: 0.8, textTransform: "uppercase" },
+  subLabel: { fontSize: 12, fontWeight: "700", color: "#6b7280", marginTop: 4 },
+  hint: { fontSize: 11, color: "#9ca3af", lineHeight: 16 },
+  macroRow: { flexDirection: "row" as const, gap: 6 },
+  mealSection: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f0fdf4" },
+  mealLabel: { fontSize: 12, fontWeight: "700" as const, color: "#374151" },
+
+  // Input
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
+    borderColor: "#d1fae5",
+    borderRadius: 12,
+    backgroundColor: "#f8fdfb",
+    paddingHorizontal: 12,
     paddingVertical: 10,
+    fontSize: 14,
+    color: "#111827",
   },
+
+  // Day chips
   dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   dayChip: {
+    borderWidth: 1, borderColor: "#d1d5db",
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: "#f9fafb",
+  },
+  dayChipActive: { borderColor: "#16a34a", backgroundColor: "#dcfce7" },
+  dayChipText: { fontSize: 12, color: "#374151", fontWeight: "500" },
+  dayChipTextActive: { color: "#166534", fontWeight: "700" },
+
+  // Buttons
+  saveButton: {
+    borderRadius: 14,
+    backgroundColor: "#16a34a",
+    paddingVertical: 14,
+    alignItems: "center",
+    shadowColor: "#16a34a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  saveButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  signOutButton: {
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#d1d5db",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  dayChipActive: { borderColor: "#ef4444", backgroundColor: "#fee2e2" },
-  dayChipText: { fontSize: 12, color: "#374151" },
-  dayChipTextActive: { color: "#991b1b", fontWeight: "700" },
-  saveButton: {
-    borderRadius: 12,
-    backgroundColor: "#ef4444",
     paddingVertical: 12,
     alignItems: "center",
+    backgroundColor: "#fff",
   },
-  saveButtonText: { color: "#fff", fontWeight: "700" },
-  button: {
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  buttonPressed: { opacity: 0.6 },
-  buttonText: { color: "#111827", fontWeight: "600" },
+  signOutButtonText: { color: "#6b7280", fontWeight: "600", fontSize: 15 },
 });
