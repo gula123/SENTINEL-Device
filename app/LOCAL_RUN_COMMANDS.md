@@ -26,8 +26,15 @@ npx expo start -c --android
 & "C:\Users\gulac\AppData\Local\Android\Sdk\emulator\emulator.exe" -list-avds
 ```
 
-## 5)
-```
+## 5) Full native build (required for Google Sign-In)
+```powershell
+cd "e:\Code\SENTINEL\SENTINEL-Device\app"
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 npx expo run:android
+```
+
+## 6)
+```
+For Web
+npx expo start --web
 ```
