@@ -102,10 +102,11 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
   const selectedFoodPreview = useMemo(() => {
     if (!selectedFood) return null;
-    const g = Number(grams);
-    if (!Number.isFinite(g) || g <= 0) return null;
+    const parsedGrams = Number(grams);
+    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
     const factor = g / 100;
     return {
+      grams: g,
       calories: Math.round(selectedFood.calories * factor),
       protein: Math.round(selectedFood.protein * factor * 10) / 10,
       carbs: Math.round(selectedFood.carbs * factor * 10) / 10,
@@ -114,14 +115,15 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   }, [selectedFood, grams]);
 
   const customFoodPreview = useMemo(() => {
-    const g = Number(customGrams);
-    if (!Number.isFinite(g) || g <= 0) return null;
+    const parsedGrams = Number(customGrams);
+    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
     const factor = g / 100;
     const calories = Number(customCalories) || 0;
     const protein = Number(customProtein) || 0;
     const carbs = Number(customCarbs) || 0;
     const fats = Number(customFats) || 0;
     return {
+      grams: g,
       calories: Math.round(calories * factor),
       protein: Math.round(protein * factor * 10) / 10,
       carbs: Math.round(carbs * factor * 10) / 10,
@@ -340,7 +342,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
             {selectedFoodPreview ? (
               <View style={s.previewBox}>
-                <Text style={s.previewTitle}>When added ({grams}g)</Text>
+                <Text style={s.previewTitle}>When added ({selectedFoodPreview.grams}g)</Text>
                 <View style={s.previewRow}>
                   <Text style={s.previewItem}>🔥 {selectedFoodPreview.calories} kcal</Text>
                   <Text style={s.previewItem}>🥩 {selectedFoodPreview.protein}g P</Text>
@@ -423,7 +425,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
               {customFoodPreview ? (
                 <View style={s.previewBox}>
-                  <Text style={s.previewTitle}>Will be logged ({customGrams}g)</Text>
+                  <Text style={s.previewTitle}>Will be logged ({customFoodPreview.grams}g)</Text>
                   <View style={s.previewRow}>
                     <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
                     <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>

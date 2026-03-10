@@ -167,9 +167,14 @@ export default function SettingsScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Profile</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Name" style={styles.input} />
-          <TextInput value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" style={styles.input} />
-          <TextInput value={targetWeight} onChangeText={setTargetWeight} placeholder="Target weight (kg)" keyboardType="numeric" style={styles.input} />
+          <Text style={styles.fieldLabel}>Name</Text>
+          <TextInput value={name} onChangeText={setName} placeholder="Enter your name" style={styles.input} />
+
+          <Text style={styles.fieldLabel}>Email</Text>
+          <TextInput value={email} onChangeText={setEmail} placeholder="Enter your email" autoCapitalize="none" style={styles.input} />
+
+          <Text style={styles.fieldLabel}>Target Weight (kg)</Text>
+          <TextInput value={targetWeight} onChangeText={setTargetWeight} placeholder="Enter your target weight" keyboardType="numeric" style={styles.input} />
         </View>
 
         <View style={styles.card}>
@@ -274,6 +279,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", letterSpacing: 0.8, textTransform: "uppercase" },
   subLabel: { fontSize: 12, fontWeight: "700", color: "#6b7280", marginTop: 4 },
+  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#374151", marginTop: 2 },
   hint: { fontSize: 11, color: "#9ca3af", lineHeight: 16 },
   macroRow: { flexDirection: "row" as const, gap: 6 },
   mealSection: { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f0fdf4" },
