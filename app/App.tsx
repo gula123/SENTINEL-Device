@@ -5,7 +5,7 @@ import AppProviders from "./src/app/providers/AppProviders";
 export default function App() {
   return (
     <AppProviders>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent={false} backgroundColor="#ffffff" />
       <RootNavigator />
     </AppProviders>
   );

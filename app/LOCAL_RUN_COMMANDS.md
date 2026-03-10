@@ -33,8 +33,13 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 npx expo run:android
 ```
 
-## 6)
+## 6) For Web
 ```
-For Web
 npx expo start --web
+```
+
+## 7) Android bundle
+```
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME="C:\Users\gulac\AppData\Local\Android\Sdk"; $env:EXPO_PUBLIC_API_URL="https://api.gulasensei.hu/api"; cd "e:\Code\SENTINEL\SENTINEL-Device\app\android"; .\gradlew.bat :app:assembleRelease :app:bundleRelease
+
 ```

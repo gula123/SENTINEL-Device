@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Android/Gradle generated outputs (if native folders are tracked later)
+**/build/
+**/reports/

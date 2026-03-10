@@ -16,7 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.sentinel.mobile",
+      "package": "hu.gurul.health.app",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -26,7 +26,10 @@
               "scheme": "com.googleusercontent.apps.955222797662-drmbh6dbtm4go4gm0u1iubmibud80eik"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "adaptiveIcon": {
@@ -39,6 +42,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "15deeef9-579f-4a9c-8094-6f4068437c9e"
+      }
     }
   }
 }

@@ -2,7 +2,8 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import * as AuthSession from "expo-auth-session";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { GOOGLE_OAUTH } from "../../config/env";
 import { loginWithGoogleToken } from "../../services/auth/authApi";
 import { useAuth } from "../../state/AuthContext";
@@ -110,7 +111,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
         <Text style={styles.title}>SENTINEL Mobile</Text>
         <Text style={styles.subtitle}>Sign in with Google to continue.</Text>

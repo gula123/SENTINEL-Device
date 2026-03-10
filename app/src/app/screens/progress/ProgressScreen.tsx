@@ -4,12 +4,12 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useCalendarData } from "../../hooks/useCalendarData";
 import { useAuth } from "../../state/AuthContext";
 
@@ -132,7 +132,7 @@ export default function ProgressScreen() {
   const isThisMonth = dayjs().isSame(month, "month");
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Page title */}

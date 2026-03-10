@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
@@ -381,7 +382,7 @@ export default function HomeScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {/* Fixed header */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
