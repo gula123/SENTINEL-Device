@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
@@ -16,7 +16,8 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { useAddFoodLog } from "../../hooks/useFoodDiary";
+import { useAddFoodLog, useFoodLogs } from "../../hooks/useFoodDiary";
+import { useUserSettings } from "../../hooks/useUserSettings";
 import {
   createCustomFood,
   estimateFoodPer100gWithAi,
@@ -25,6 +26,7 @@ import {
   type FoodItem,
   type MealType,
 } from "../../services/food/foodLogsApi";
+import { resolvePerDayLimitsForEdit } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
 
 const MEAL_LABEL: Record<MealType, string> = {
@@ -40,6 +42,13 @@ const MEAL_ICON: Record<MealType, string> = {
   SNACKS: "🍎",
 };
 
+const mealKeyByType = {
+  BREAKFAST: "breakfast",
+  LUNCH: "lunch",
+  DINNER: "dinner",
+  SNACKS: "snacks",
+} as const;
+
 type Props = NativeStackScreenProps<MainStackParamList, "LogFood">;
 
 export default function LogFoodScreen({ route, navigation }: Props) {
@@ -50,6 +59,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const [results, setResults] = useState<FoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [searching, setSearching] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const [showCustom, setShowCustom] = useState(false);
   const [customName, setCustomName] = useState("");
@@ -63,6 +73,61 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
+  const logsQuery = useFoodLogs(date);
+  const settingsQuery = useUserSettings();
+
+  const currentMealLogs = useMemo(
+    () => (logsQuery.data || []).filter((item) => (item.mealType || "SNACKS") === meal),
+    [logsQuery.data, meal]
+  );
+
+  const consumed = useMemo(() => {
+    return currentMealLogs.reduce(
+      (acc, item) => ({
+        calories: acc.calories + (item.calories || 0),
+        protein: acc.protein + (item.protein || 0),
+        carbs: acc.carbs + (item.carbs || 0),
+        fats: acc.fats + (item.fats || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+  }, [currentMealLogs]);
+
+  const mealLimits = useMemo(() => {
+    const perDay = resolvePerDayLimitsForEdit(settingsQuery.data);
+    const dayName = dayjs(date).format("dddd");
+    const key = mealKeyByType[meal];
+    return perDay[dayName]?.meals[key] || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+  }, [settingsQuery.data, date, meal]);
+
+  const selectedFoodPreview = useMemo(() => {
+    if (!selectedFood) return null;
+    const g = Number(grams);
+    if (!Number.isFinite(g) || g <= 0) return null;
+    const factor = g / 100;
+    return {
+      calories: Math.round(selectedFood.calories * factor),
+      protein: Math.round(selectedFood.protein * factor * 10) / 10,
+      carbs: Math.round(selectedFood.carbs * factor * 10) / 10,
+      fats: Math.round(selectedFood.fats * factor * 10) / 10,
+    };
+  }, [selectedFood, grams]);
+
+  const customFoodPreview = useMemo(() => {
+    const g = Number(customGrams);
+    if (!Number.isFinite(g) || g <= 0) return null;
+    const factor = g / 100;
+    const calories = Number(customCalories) || 0;
+    const protein = Number(customProtein) || 0;
+    const carbs = Number(customCarbs) || 0;
+    const fats = Number(customFats) || 0;
+    return {
+      calories: Math.round(calories * factor),
+      protein: Math.round(protein * factor * 10) / 10,
+      carbs: Math.round(carbs * factor * 10) / 10,
+      fats: Math.round(fats * factor * 10) / 10,
+    };
+  }, [customCalories, customProtein, customCarbs, customFats, customGrams]);
 
   const aiMutation = useMutation({
     mutationFn: async (name: string): Promise<AiFoodEstimate> => {
@@ -121,17 +186,59 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     Alert.alert("Error", msg);
   }
 
-  const onSearch = async (text: string) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (!token || debouncedQuery.trim().length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    // If user just picked an item, avoid re-searching the same text.
+    if (selectedFood && debouncedQuery.trim().toLowerCase() === selectedFood.name.trim().toLowerCase()) {
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const runSearch = async () => {
+      try {
+        setSearching(true);
+        const foods = await searchFoods(token, debouncedQuery);
+        if (!cancelled) {
+          setResults(foods.slice(0, 8));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          Alert.alert("Search failed", err instanceof Error ? err.message : "Try again");
+        }
+      } finally {
+        if (!cancelled) {
+          setSearching(false);
+        }
+      }
+    };
+
+    runSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery, token, selectedFood]);
+
+  const onSearch = (text: string) => {
     setQuery(text);
     setSelectedFood(null);
-    if (!token || text.trim().length < 2) { setResults([]); return; }
-    try {
-      setSearching(true);
-      const foods = await searchFoods(token, text);
-      setResults(foods.slice(0, 8));
-    } catch (err) {
-      Alert.alert("Search failed", err instanceof Error ? err.message : "Try again");
-    } finally {
+    if (text.trim().length < 2) {
+      setResults([]);
       setSearching(false);
     }
   };
@@ -172,6 +279,29 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Meal Statistics</Text>
+            <Text style={s.mealHint}>Consumed / Limit</Text>
+            <View style={s.metricsGrid}>
+              <View style={s.metricBoxCompact}>
+                <Text style={s.metricLabel}>Calories</Text>
+                <Text style={s.metricValue}>{Math.round(consumed.calories)} / {Math.round(mealLimits.calories)}</Text>
+              </View>
+              <View style={s.metricBoxCompact}>
+                <Text style={s.metricLabel}>Protein</Text>
+                <Text style={s.metricValue}>{Math.round(consumed.protein * 10) / 10}g / {Math.round(mealLimits.protein * 10) / 10}g</Text>
+              </View>
+              <View style={s.metricBoxCompact}>
+                <Text style={s.metricLabel}>Carbs</Text>
+                <Text style={s.metricValue}>{Math.round(consumed.carbs * 10) / 10}g / {Math.round(mealLimits.carbs * 10) / 10}g</Text>
+              </View>
+              <View style={s.metricBoxCompact}>
+                <Text style={s.metricLabel}>Fats</Text>
+                <Text style={s.metricValue}>{Math.round(consumed.fats * 10) / 10}g / {Math.round(mealLimits.fats * 10) / 10}g</Text>
+              </View>
+            </View>
+          </View>
+
           {/* Search card */}
           <View style={s.card}>
             <Text style={s.cardTitle}>Search Food</Text>
@@ -208,6 +338,18 @@ export default function LogFoodScreen({ route, navigation }: Props) {
               </View>
             ) : null}
 
+            {selectedFoodPreview ? (
+              <View style={s.previewBox}>
+                <Text style={s.previewTitle}>When added ({grams}g)</Text>
+                <View style={s.previewRow}>
+                  <Text style={s.previewItem}>🔥 {selectedFoodPreview.calories} kcal</Text>
+                  <Text style={s.previewItem}>🥩 {selectedFoodPreview.protein}g P</Text>
+                  <Text style={s.previewItem}>🍚 {selectedFoodPreview.carbs}g C</Text>
+                  <Text style={s.previewItem}>🥑 {selectedFoodPreview.fats}g F</Text>
+                </View>
+              </View>
+            ) : null}
+
             <View style={s.row}>
               <TextInput
                 value={grams}
@@ -228,18 +370,39 @@ export default function LogFoodScreen({ route, navigation }: Props) {
             </View>
           </View>
 
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Already Added Foods</Text>
+
+            {logsQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
+
+            {currentMealLogs.length > 0 ? (
+              <View style={s.results}>
+                {currentMealLogs.map((item) => (
+                  <View key={item.id} style={s.resultRow}>
+                    <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
+                    <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={s.emptyMealText}>No foods added to this meal yet.</Text>
+            )}
+          </View>
+
           {/* Custom food */}
           <Pressable
             onPress={() => setShowCustom((v) => !v)}
             style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
           >
-            <Text style={s.customToggleText}>{showCustom ? "▲ Hide Custom Food" : "▼ Custom Food + AI"}</Text>
+            <Text style={s.customToggleText}>{showCustom ? "▲ Hide Create New Food" : "▼ Create New Food"}</Text>
           </Pressable>
 
           {showCustom ? (
             <View style={s.card}>
-              <Text style={s.cardTitle}>Custom Food (per 100g)</Text>
+              <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
+              <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set "Log grams" to how much you ate now.</Text>
 
+              <Text style={s.fieldHelp}>Food name: what you want this food saved as.</Text>
               <TextInput value={customName} onChangeText={setCustomName} placeholder="Food name" placeholderTextColor="#9ca3af" style={s.input} />
 
               <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
@@ -247,11 +410,28 @@ export default function LogFoodScreen({ route, navigation }: Props) {
               </Pressable>
               {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
 
+              <Text style={s.fieldHelp}>Calories per 100g.</Text>
               <TextInput value={customCalories} onChangeText={setCustomCalories} keyboardType="numeric" placeholder="Calories / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <Text style={s.fieldHelp}>Protein grams per 100g.</Text>
               <TextInput value={customProtein} onChangeText={setCustomProtein} keyboardType="numeric" placeholder="Protein g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <Text style={s.fieldHelp}>Carbs grams per 100g.</Text>
               <TextInput value={customCarbs} onChangeText={setCustomCarbs} keyboardType="numeric" placeholder="Carbs g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <Text style={s.fieldHelp}>Fats grams per 100g.</Text>
               <TextInput value={customFats} onChangeText={setCustomFats} keyboardType="numeric" placeholder="Fats g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <Text style={s.fieldHelp}>Log grams: amount eaten right now.</Text>
               <TextInput value={customGrams} onChangeText={setCustomGrams} keyboardType="numeric" placeholder="Log grams" placeholderTextColor="#9ca3af" style={s.input} />
+
+              {customFoodPreview ? (
+                <View style={s.previewBox}>
+                  <Text style={s.previewTitle}>Will be logged ({customGrams}g)</Text>
+                  <View style={s.previewRow}>
+                    <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
+                    <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
+                    <Text style={s.previewItem}>🍚 {customFoodPreview.carbs}g C</Text>
+                    <Text style={s.previewItem}>🥑 {customFoodPreview.fats}g F</Text>
+                  </View>
+                </View>
+              ) : null}
 
               <Pressable
                 onPress={() => createCustomMutation.mutate()}
@@ -262,6 +442,15 @@ export default function LogFoodScreen({ route, navigation }: Props) {
               </Pressable>
             </View>
           ) : null}
+
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Done adding foods"
+            style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
+          >
+            <Text style={s.doneBtnText}>Done</Text>
+          </Pressable>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -322,6 +511,8 @@ const s = StyleSheet.create({
     color: "#111827",
     backgroundColor: "#f9fafb",
   },
+  helperText: { fontSize: 12, color: "#6b7280", lineHeight: 17 },
+  fieldHelp: { fontSize: 11, color: "#9ca3af", marginBottom: -4 },
 
   results: {
     borderWidth: 1,
@@ -329,6 +520,36 @@ const s = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
   },
+  mealHint: { fontSize: 12, color: "#6b7280", marginTop: -2 },
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  metricBoxCompact: {
+    width: "48%",
+    borderWidth: 1,
+    borderColor: "#dcfce7",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+  },
+  metricLabel: { fontSize: 11, color: "#166534", fontWeight: "700", textTransform: "uppercase" },
+  metricValue: { fontSize: 12, color: "#111827", fontWeight: "600" },
+  emptyMealText: { fontSize: 12, color: "#9ca3af", fontStyle: "italic" },
+  previewBox: {
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  previewTitle: { fontSize: 12, color: "#166534", fontWeight: "700" },
+  previewRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  previewItem: { fontSize: 12, color: "#374151", fontWeight: "600" },
   resultRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -382,6 +603,15 @@ const s = StyleSheet.create({
   },
   aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
   aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
+
+  doneBtn: {
+    backgroundColor: "#111827",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   pressed: { opacity: 0.65 },
 });
