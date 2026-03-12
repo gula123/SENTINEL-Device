@@ -49,6 +49,11 @@ jobs:
           KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/upload-keystore.jks"
           mkdir -p "$(dirname "$KEYSTORE_PATH")"
           printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "Keystore SHA1:"
+          keytool -list -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}" \
+            2>/dev/null | grep "SHA1:"
 
       - name: Create keystore.properties
         env:
@@ -56,14 +61,16 @@ jobs:
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: |
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/app/android/app/upload-keystore.jks"
           KEYSTORE_PROPS_PATH="$GITHUB_WORKSPACE/app/android/keystore.properties"
-          mkdir -p "$(dirname "$KEYSTORE_PROPS_PATH")"
           cat > "$KEYSTORE_PROPS_PATH" <<EOF
-          storeFile=upload-keystore.jks
-          storePassword=$ANDROID_UPLOAD_STORE_PASSWORD
-          keyAlias=$ANDROID_UPLOAD_KEY_ALIAS
-          keyPassword=$ANDROID_UPLOAD_KEY_PASSWORD
-          EOF
+storeFile=$KEYSTORE_PATH
+storePassword=$ANDROID_UPLOAD_STORE_PASSWORD
+keyAlias=$ANDROID_UPLOAD_KEY_ALIAS
+keyPassword=$ANDROID_UPLOAD_KEY_PASSWORD
+EOF
+          echo "keystore.properties written:"
+          cat "$KEYSTORE_PROPS_PATH"
 
       - name: Build Android app bundle (AAB)
         env:
