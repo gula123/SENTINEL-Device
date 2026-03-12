@@ -30,6 +30,8 @@ npx expo start -c --android
 ```powershell
 cd "e:\Code\SENTINEL\SENTINEL-Device\app"
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME = "C:\Users\gulac\AppData\Local\Android\Sdk"
+$env:ANDROID_SDK_ROOT = "C:\Users\gulac\AppData\Local\Android\Sdk"
 npx expo run:android
 ```
 
@@ -43,3 +45,19 @@ npx expo start --web
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME="C:\Users\gulac\AppData\Local\Android\Sdk"; $env:EXPO_PUBLIC_API_URL="https://api.gulasensei.hu/api"; cd "e:\Code\SENTINEL\SENTINEL-Device\app\android"; .\gradlew.bat :app:assembleRelease :app:bundleRelease
 
 ```
+
+## 8) If Google login shows DEVELOPER_ERROR (Android)
+```powershell
+cd "e:\Code\SENTINEL\SENTINEL-Device\app\android"
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME="C:\Users\gulac\AppData\Local\Android\Sdk"
+$env:ANDROID_SDK_ROOT="C:\Users\gulac\AppData\Local\Android\Sdk"
+.\gradlew.bat :app:signingReport
+```
+
+Expected for local debug:
+- Package: hu.gurul.health.app
+- Keystore: C:\Users\gulac\.android\debug.keystore
+
+If signingReport shows a different keystore/SHA1 than Google Console Android OAuth client,
+Google Sign-In will fail with DEVELOPER_ERROR.
