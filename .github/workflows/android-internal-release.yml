@@ -38,6 +38,13 @@ jobs:
           EXPO_PUBLIC_API_URL: https://api.gulasensei.hu/api
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Set unique Android versionCode
+        run: |
+          VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
+          sed -i -E "0,/versionCode [0-9]+/s//versionCode ${VERSION_CODE}/" android/app/build.gradle
+          echo "Using versionCode: ${VERSION_CODE}"
+          grep -n "versionCode" android/app/build.gradle | head -n 1
+
       - name: Decode Android upload keystore
         env:
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
