@@ -105,3 +105,4 @@ jobs:
           packageName: hu.gurul.health.app
           releaseFiles: app/android/app/build/outputs/bundle/release/app-release.aab
           track: internal
+          status: draft
