@@ -61,15 +61,6 @@ const STATUS_LABEL: Record<ColorCategory, string> = {
   none:     "No data",
 };
 
-const LEGEND_ITEMS: { cat: ColorCategory; label: string }[] = [
-  { cat: "perfect",  label: "< 100% — Perfect" },
-  { cat: "good",     label: "100–108% — Good" },
-  { cat: "warning",  label: "108–115% — Warning" },
-  { cat: "caution",  label: "115–125% — Caution" },
-  { cat: "exceeded", label: "> 125% — Exceeded" },
-  { cat: "vacation", label: "Vacation day" },
-];
-
 // ─── Screen ─────────────────────────────────────────────────────────────────
 export default function ProgressScreen() {
   const [month, setMonth] = useState(dayjs().startOf("month"));
@@ -107,13 +98,14 @@ export default function ProgressScreen() {
 
   // ── Monthly stats (replacing desktop tooltips) ───────────────────────────
   const stats = useMemo(() => {
-    const base = { streak: data?.streak ?? 0, green: 0, yellow: 0, red: 0, vacation: vacationSet.size };
+    const base = { streak: data?.streak ?? 0, green: 0, yellow: 0, orange: 0, red: 0, vacation: vacationSet.size };
     if (!data?.dailyCalories) return base;
     const entries = Object.entries(data.dailyCalories).filter(([d]) => !vacationSet.has(Number(d)));
     return {
       ...base,
       green:  entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit <= 1.08).length,
-      yellow: entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit > 1.08 && consumed / limit <= 1.25).length,
+      yellow: entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit > 1.08 && consumed / limit <= 1.15).length,
+      orange: entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit > 1.15 && consumed / limit <= 1.25).length,
       red:    entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit > 1.25).length,
     };
   }, [data, vacationSet]);
@@ -125,7 +117,7 @@ export default function ProgressScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Page title */}
-        <Text style={styles.pageTitle}>Progress</Text>
+        <Text style={styles.pageTitle}>Calendar</Text>
 
         {/* Month navigator */}
         <View style={styles.monthCard}>
@@ -176,36 +168,57 @@ export default function ProgressScreen() {
 
         {data ? (
           <>
+            <View style={styles.streakCard}>
+              <Text style={styles.streakEmoji}>🔥</Text>
+              <Text style={styles.streakValue}>{stats.streak}</Text>
+              <Text style={styles.streakLabel}>Day streak</Text>
+            </View>
+
             {/* ── Stats strip ─────────────────────────────────────────── */}
             <View style={styles.statsCard}>
               <View style={styles.statItem}>
-                <Text style={styles.statEmoji}>🔥</Text>
-                <Text style={styles.statValue}>{stats.streak}</Text>
-                <Text style={styles.statLabel}>Streak</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
                 <Text style={[styles.statGlyph, { color: "#16a34a" }]}>✓</Text>
                 <Text style={styles.statValue}>{stats.green}</Text>
-                <Text style={styles.statLabel}>Green</Text>
+                <View style={[styles.statLabelPill, { backgroundColor: "#dcfce7" }]}> 
+                  <Text style={[styles.statLabelText, { color: "#166534" }]}>Green</Text>
+                </View>
+                <Text style={styles.statRange}>≤108%</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statGlyph, { color: "#d97706" }]}>!</Text>
                 <Text style={styles.statValue}>{stats.yellow}</Text>
-                <Text style={styles.statLabel}>Yellow</Text>
+                <View style={[styles.statLabelPill, { backgroundColor: "#fef9c3" }]}> 
+                  <Text style={[styles.statLabelText, { color: "#854d0e" }]}>Yellow</Text>
+                </View>
+                <Text style={styles.statRange}>108–115%</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statGlyph, { color: "#ea580c" }]}>!</Text>
+                <Text style={styles.statValue}>{stats.orange}</Text>
+                <View style={[styles.statLabelPill, { backgroundColor: "#ffedd5" }]}> 
+                  <Text style={[styles.statLabelText, { color: "#9a3412" }]}>Orange</Text>
+                </View>
+                <Text style={styles.statRange}>115–125%</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statGlyph, { color: "#dc2626" }]}>✕</Text>
                 <Text style={styles.statValue}>{stats.red}</Text>
-                <Text style={styles.statLabel}>Red</Text>
+                <View style={[styles.statLabelPill, { backgroundColor: "#fee2e2" }]}> 
+                  <Text style={[styles.statLabelText, { color: "#991b1b" }]}>Red</Text>
+                </View>
+                <Text style={styles.statRange}>{">125%"}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statEmoji}>🏖️</Text>
                 <Text style={styles.statValue}>{stats.vacation}</Text>
-                <Text style={styles.statLabel}>Vacation</Text>
+                <View style={[styles.statLabelPill, { backgroundColor: "#dbeafe" }]}> 
+                  <Text style={[styles.statLabelText, { color: "#1e40af" }]}>Vacation</Text>
+                </View>
+                <Text style={styles.statRange}>Day off</Text>
               </View>
             </View>
 
@@ -256,22 +269,6 @@ export default function ProgressScreen() {
 
               <Text style={styles.tapHint}>Tap a day to open diary</Text>
             </View>
-
-            {/* ── Color legend ─────────────────────────────────────────── */}
-            <View style={styles.legendCard}>
-              <Text style={styles.sectionTitle}>Color Guide</Text>
-              <View style={styles.legendGrid}>
-                {LEGEND_ITEMS.map(({ cat, label }) => (
-                  <View key={cat} style={styles.legendRow}>
-                    <View style={[styles.legendSwatch, {
-                      backgroundColor: CAT[cat].bg,
-                      borderColor: CAT[cat].border,
-                    }]} />
-                    <Text style={styles.legendText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
           </>
         ) : null}
       </ScrollView>
@@ -313,6 +310,26 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: "#991b1b", fontWeight: "600" },
   pressed: { opacity: 0.7 },
 
+  streakCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    shadowColor: "#f59e0b",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  streakEmoji: { fontSize: 16, lineHeight: 20 },
+  streakValue: { fontSize: 22, fontWeight: "800", color: "#92400e", lineHeight: 24 },
+  streakLabel: { fontSize: 11, fontWeight: "700", color: "#b45309", textTransform: "uppercase", letterSpacing: 0.5 },
+
   // Stats strip
   statsCard: {
     flexDirection: "row", alignItems: "center",
@@ -326,7 +343,15 @@ const styles = StyleSheet.create({
   statEmoji: { fontSize: 16, lineHeight: 20 },
   statGlyph: { fontSize: 15, fontWeight: "800", lineHeight: 20 },
   statValue: { fontSize: 20, fontWeight: "800", color: "#111827", lineHeight: 24 },
-  statLabel: { fontSize: 9, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 },
+  statRange: { fontSize: 9, fontWeight: "700", color: "#6b7280", lineHeight: 12 },
+  statLabelPill: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    minWidth: 50,
+    alignItems: "center",
+  },
+  statLabelText: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
 
   // Calendar
   calendarCard: {
@@ -349,15 +374,4 @@ const styles = StyleSheet.create({
   dayNum: { fontSize: 12, fontWeight: "700", lineHeight: 14 },
   dayIcon: { fontSize: 8, fontWeight: "800", lineHeight: 10 },
   tapHint: { textAlign: "center", fontSize: 10, color: "#d1d5db", marginTop: 6 },
-
-  // Legend
-  legendCard: {
-    backgroundColor: "#fff", borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: "#e5e7eb", gap: 12,
-  },
-  sectionTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", letterSpacing: 0.8, textTransform: "uppercase" },
-  legendGrid: { gap: 8 },
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  legendSwatch: { width: 22, height: 22, borderRadius: 6, borderWidth: 1 },
-  legendText: { fontSize: 12, color: "#374151", fontWeight: "500" },
 });
