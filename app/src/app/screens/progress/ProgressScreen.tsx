@@ -1,5 +1,7 @@
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import {
   ActivityIndicator,
   Platform,
@@ -10,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { MainTabParamList } from "../../navigation/MainTabs";
 import { useCalendarData } from "../../hooks/useCalendarData";
 import { useAuth } from "../../state/AuthContext";
 
@@ -70,8 +73,8 @@ const LEGEND_ITEMS: { cat: ColorCategory; label: string }[] = [
 // ─── Screen ─────────────────────────────────────────────────────────────────
 export default function ProgressScreen() {
   const [month, setMonth] = useState(dayjs().startOf("month"));
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const { signOut } = useAuth();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, "Progress">>();
   const yearMonth = month.format("YYYY-MM");
   const { data, isLoading, isError, error, refetch } = useCalendarData(yearMonth);
   const isAuthExpired = error instanceof Error && error.message === "AUTH_EXPIRED";
@@ -115,20 +118,6 @@ export default function ProgressScreen() {
     };
   }, [data, vacationSet]);
 
-  // ── Selected day detail (replaces desktop hover tooltips) ────────────────
-  const detail = useMemo(() => {
-    if (!selectedDay || !data) return null;
-    const cat = categoryForDay(selectedDay);
-    const dc  = data.dailyCalories?.[selectedDay];
-    return {
-      label:    month.date(selectedDay).format("dddd, MMM D, YYYY"),
-      cat,
-      consumed: dc?.consumed ?? null,
-      limit:    dc?.limit    ?? null,
-      ratio:    dc && dc.limit > 0 ? dc.consumed / dc.limit : null,
-    };
-  }, [selectedDay, data, month]);
-
   const isThisMonth = dayjs().isSame(month, "month");
 
   return (
@@ -141,7 +130,7 @@ export default function ProgressScreen() {
         {/* Month navigator */}
         <View style={styles.monthCard}>
           <Pressable
-            onPress={() => { setMonth(m => m.subtract(1, "month")); setSelectedDay(null); }}
+            onPress={() => { setMonth(m => m.subtract(1, "month")); }}
             style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
             accessibilityLabel="Previous month"
           >
@@ -149,7 +138,7 @@ export default function ProgressScreen() {
           </Pressable>
           <Text style={styles.monthLabel}>{month.format("MMMM YYYY")}</Text>
           <Pressable
-            onPress={() => { setMonth(m => m.add(1, "month")); setSelectedDay(null); }}
+            onPress={() => { setMonth(m => m.add(1, "month")); }}
             style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
             accessibilityLabel="Next month"
           >
@@ -242,19 +231,20 @@ export default function ProgressScreen() {
                     const cat = categoryForDay(cell.day);
                     const cs = CAT[cat];
                     const todayCell = isThisMonth && dayjs().date() === cell.day;
-                    const sel = selectedDay === cell.day;
                     return (
                       <Pressable
                         key={cell.key}
-                        onPress={() => setSelectedDay(d => d === cell.day ? null : cell.day)}
+                        onPress={() => {
+                          const targetDate = month.date(cell.day).format("YYYY-MM-DD");
+                          navigation.navigate("Diary", { date: targetDate, focusToken: Date.now() });
+                        }}
                         style={({ pressed }) => [
                           styles.dayCell,
                           { backgroundColor: cs.bg, borderColor: cs.border },
                           todayCell && styles.dayCellToday,
-                          sel && styles.dayCellSelected,
                           pressed && styles.pressed,
                         ]}
-                        accessibilityLabel={`Day ${cell.day}, ${STATUS_LABEL[cat]}`}
+                        accessibilityLabel={`Open diary for day ${cell.day}, ${STATUS_LABEL[cat]}`}
                       >
                         <Text style={[styles.dayNum, { color: cs.text }]}>{cell.day}</Text>
                         {cs.icon ? <Text style={[styles.dayIcon, { color: cs.text }]}>{cs.icon}</Text> : null}
@@ -264,61 +254,8 @@ export default function ProgressScreen() {
                 </View>
               ))}
 
-              <Text style={styles.tapHint}>Tap a day to see details</Text>
+              <Text style={styles.tapHint}>Tap a day to open diary</Text>
             </View>
-
-            {/* ── Selected day detail card (tooltip equivalent) ────────── */}
-            {detail ? (
-              <View style={[styles.detailCard, { borderColor: CAT[detail.cat].border }]}>
-                <View style={styles.detailHeaderRow}>
-                  <Text style={styles.detailDate}>{detail.label}</Text>
-                  <View style={[styles.detailBadge, {
-                    backgroundColor: CAT[detail.cat].bg,
-                    borderColor: CAT[detail.cat].border,
-                  }]}>
-                    <Text style={[styles.detailBadgeText, { color: CAT[detail.cat].text }]}>
-                      {CAT[detail.cat].icon} {STATUS_LABEL[detail.cat]}
-                    </Text>
-                  </View>
-                </View>
-
-                {detail.consumed !== null && detail.limit !== null ? (
-                  <>
-                    <View style={styles.detailStatRow}>
-                      <View style={styles.detailStat}>
-                        <Text style={styles.detailStatLabel}>Consumed</Text>
-                        <Text style={styles.detailStatValue}>{Math.round(detail.consumed)}</Text>
-                        <Text style={styles.detailStatUnit}>kcal</Text>
-                      </View>
-                      <View style={styles.detailStat}>
-                        <Text style={styles.detailStatLabel}>Limit</Text>
-                        <Text style={styles.detailStatValue}>{Math.round(detail.limit)}</Text>
-                        <Text style={styles.detailStatUnit}>kcal</Text>
-                      </View>
-                      <View style={styles.detailStat}>
-                        <Text style={styles.detailStatLabel}>Ratio</Text>
-                        <Text style={[styles.detailStatValue, { color: CAT[detail.cat].text }]}>
-                          {detail.ratio !== null ? `${Math.round(detail.ratio * 100)}%` : "—"}
-                        </Text>
-                        <Text style={styles.detailStatUnit}>of limit</Text>
-                      </View>
-                    </View>
-                    <View style={styles.detailTrack}>
-                      <View style={[styles.detailFill, {
-                        width: `${Math.min(100, Math.round((detail.ratio ?? 0) * 100))}%` as any,
-                        backgroundColor: CAT[detail.cat].border,
-                      }]} />
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.detailNoData}>
-                    {detail.cat === "vacation"
-                      ? "🏖️ Vacation day — not tracked"
-                      : "No food logged this day"}
-                  </Text>
-                )}
-              </View>
-            ) : null}
 
             {/* ── Color legend ─────────────────────────────────────────── */}
             <View style={styles.legendCard}>
@@ -412,29 +349,6 @@ const styles = StyleSheet.create({
   dayNum: { fontSize: 12, fontWeight: "700", lineHeight: 14 },
   dayIcon: { fontSize: 8, fontWeight: "800", lineHeight: 10 },
   tapHint: { textAlign: "center", fontSize: 10, color: "#d1d5db", marginTop: 6 },
-
-  // Detail card
-  detailCard: {
-    backgroundColor: "#fff", borderRadius: 16, padding: 16,
-    borderWidth: 2, gap: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  detailHeaderRow: { gap: 8 },
-  detailDate: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  detailBadge: {
-    alignSelf: "flex-start", borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1,
-  },
-  detailBadgeText: { fontSize: 12, fontWeight: "700" },
-  detailStatRow: { flexDirection: "row" },
-  detailStat: { flex: 1, alignItems: "center", gap: 1 },
-  detailStatLabel: { fontSize: 10, color: "#9ca3af", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
-  detailStatValue: { fontSize: 20, fontWeight: "800", color: "#111827" },
-  detailStatUnit: { fontSize: 10, color: "#9ca3af" },
-  detailTrack: { height: 6, backgroundColor: "#f3f4f6", borderRadius: 99, overflow: "hidden" },
-  detailFill: { height: "100%", borderRadius: 99 },
-  detailNoData: { fontSize: 13, color: "#9ca3af", textAlign: "center", paddingVertical: 8 },
 
   // Legend
   legendCard: {

@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addFoodLog, deleteFoodLog, fetchFoodLogs, MealType, updateFoodLogGrams } from "../services/food/foodLogsApi";
 import { useAuth } from "../state/AuthContext";
 
-export const useFoodLogs = (date: string) => {
+export const useFoodLogs = (date: string, options?: { enabled?: boolean }) => {
   const { token } = useAuth();
+  const enabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: ["foodLogs", date],
@@ -13,7 +14,7 @@ export const useFoodLogs = (date: string) => {
       }
       return fetchFoodLogs(token, date);
     },
-    enabled: Boolean(token),
+    enabled: Boolean(token) && enabled,
   });
 };
 

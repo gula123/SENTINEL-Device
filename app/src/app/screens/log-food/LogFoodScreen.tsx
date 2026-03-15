@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { useAddFoodLog, useFoodLogs } from "../../hooks/useFoodDiary";
+import { useAddFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import {
   createCustomFood,
@@ -73,8 +73,11 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
+  const updateMutation = useUpdateFoodLog(date);
   const logsQuery = useFoodLogs(date);
   const settingsQuery = useUserSettings();
+  const [editingLogId, setEditingLogId] = useState<number | null>(null);
+  const [editingGrams, setEditingGrams] = useState("");
 
   const currentMealLogs = useMemo(
     () => (logsQuery.data || []).filter((item) => (item.mealType || "SNACKS") === meal),
@@ -130,6 +133,27 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       fats: Math.round(fats * factor * 10) / 10,
     };
   }, [customCalories, customProtein, customCarbs, customFats, customGrams]);
+
+  const editingLog = useMemo(
+    () => currentMealLogs.find((item) => item.id === editingLogId) || null,
+    [currentMealLogs, editingLogId]
+  );
+
+  const editingPreview = useMemo(() => {
+    if (!editingLog) return null;
+    const parsedGrams = Number(editingGrams);
+    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
+    const baseGrams = editingLog.grams > 0 ? editingLog.grams : 100;
+    const factor = g / baseGrams;
+
+    return {
+      grams: g,
+      calories: Math.round((editingLog.calories || 0) * factor),
+      protein: Math.round((editingLog.protein || 0) * factor * 10) / 10,
+      carbs: Math.round((editingLog.carbs || 0) * factor * 10) / 10,
+      fats: Math.round((editingLog.fats || 0) * factor * 10) / 10,
+    };
+  }, [editingLog, editingGrams]);
 
   const aiMutation = useMutation({
     mutationFn: async (name: string): Promise<AiFoodEstimate> => {
@@ -258,6 +282,34 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const onStartEditLog = (logId: number, currentGrams: number) => {
+    setEditingLogId(logId);
+    setEditingGrams(String(Math.round(currentGrams * 10) / 10));
+  };
+
+  const onCancelEditLog = () => {
+    setEditingLogId(null);
+    setEditingGrams("");
+  };
+
+  const onSaveEditedLog = async () => {
+    if (!editingLog) return;
+    const g = Number(editingGrams);
+    if (!Number.isFinite(g) || g <= 0) {
+      Alert.alert("Invalid grams", "Enter a positive number.");
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({ logId: editingLog.id, grams: g });
+      invalidate();
+      onCancelEditLog();
+      Alert.alert("Updated", "Food grams updated.");
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
   const onAiEstimate = async () => {
     if (!customName.trim()) { Alert.alert("Enter a food name first."); return; }
     try { await aiMutation.mutateAsync(customName.trim()); }
@@ -307,38 +359,47 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           {/* Search card */}
           <View style={s.card}>
             <Text style={s.cardTitle}>Search Food</Text>
-            <TextInput
-              value={query}
-              onChangeText={onSearch}
-              placeholder="Type at least 2 characters…"
-              placeholderTextColor="#9ca3af"
-              style={s.input}
-              autoFocus
-              returnKeyType="search"
-            />
-
-            {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
-
-            {results.length > 0 ? (
-              <View style={s.results}>
-                {results.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => { setSelectedFood(item); setQuery(item.name); setResults([]); }}
-                    style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
-                  >
-                    <Text style={s.resultName}>{item.name}</Text>
-                    <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
             {selectedFood ? (
-              <View style={s.selectedBadge}>
-                <Text style={s.selectedText}>✓ {selectedFood.name}</Text>
+              <View style={s.selectedChip}>
+                <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
+                <Pressable
+                  onPress={() => { setSelectedFood(null); setQuery(""); setResults([]); }}
+                  style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}
+                  accessibilityLabel="Clear selected food"
+                >
+                  <Text style={s.clearBtnText}>✕</Text>
+                </Pressable>
               </View>
-            ) : null}
+            ) : (
+              <>
+                <TextInput
+                  value={query}
+                  onChangeText={onSearch}
+                  placeholder="Type at least 2 characters…"
+                  placeholderTextColor="#9ca3af"
+                  style={s.input}
+                  autoFocus
+                  returnKeyType="search"
+                />
+
+                {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
+
+                {results.length > 0 ? (
+                  <View style={s.results}>
+                    {results.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => { setSelectedFood(item); setQuery(item.name); setResults([]); }}
+                        style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
+                      >
+                        <Text style={s.resultName}>{item.name}</Text>
+                        <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            )}
 
             {selectedFoodPreview ? (
               <View style={s.previewBox}>
@@ -380,15 +441,64 @@ export default function LogFoodScreen({ route, navigation }: Props) {
             {currentMealLogs.length > 0 ? (
               <View style={s.results}>
                 {currentMealLogs.map((item) => (
-                  <View key={item.id} style={s.resultRow}>
+                  <Pressable
+                    key={item.id}
+                    onPress={() => onStartEditLog(item.id, item.grams)}
+                    style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
+                  >
                     <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
                     <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             ) : (
               <Text style={s.emptyMealText}>No foods added to this meal yet.</Text>
             )}
+
+            {editingLog ? (
+              <View style={s.editBox}>
+                <Text style={s.editTitle}>Edit {editingLog.foodName}</Text>
+                <View style={s.row}>
+                  <TextInput
+                    value={editingGrams}
+                    onChangeText={setEditingGrams}
+                    keyboardType="numeric"
+                    placeholder="New grams"
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.gramsInput]}
+                    returnKeyType="done"
+                  />
+                </View>
+
+                {editingPreview ? (
+                  <View style={s.previewBox}>
+                    <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
+                    <View style={s.previewRow}>
+                      <Text style={s.previewItem}>🔥 {editingPreview.calories} kcal</Text>
+                      <Text style={s.previewItem}>🥩 {editingPreview.protein}g P</Text>
+                      <Text style={s.previewItem}>🍚 {editingPreview.carbs}g C</Text>
+                      <Text style={s.previewItem}>🥑 {editingPreview.fats}g F</Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={s.editActions}>
+                  <Pressable
+                    onPress={onCancelEditLog}
+                    style={({ pressed }) => [s.cancelBtn, pressed && s.pressed]}
+                  >
+                    <Text style={s.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onSaveEditedLog}
+                    disabled={updateMutation.isPending}
+                    style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
+                  >
+                    <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           {/* Custom food */}
@@ -564,14 +674,27 @@ const s = StyleSheet.create({
   resultName: { flex: 1, fontSize: 13, color: "#111827", marginRight: 8 },
   resultMeta: { fontSize: 12, color: "#9ca3af" },
 
-  selectedBadge: {
+  selectedChip: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#dcfce7",
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: "#bbf7d0",
+    gap: 8,
   },
-  selectedText: { fontSize: 13, color: "#166534", fontWeight: "600" },
+  selectedChipText: { flex: 1, fontSize: 13, color: "#166534", fontWeight: "600" },
+  clearBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearBtnText: { fontSize: 13, color: "#166534", fontWeight: "700", lineHeight: 16 },
 
   row: { flexDirection: "row", gap: 10, alignItems: "center" },
   gramsInput: { flex: 1 },
@@ -605,6 +728,29 @@ const s = StyleSheet.create({
   },
   aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
   aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
+
+  editBox: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  editTitle: { fontSize: 13, fontWeight: "700", color: "#166534" },
+  editActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8 },
+  cancelBtn: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  cancelBtnText: { fontSize: 14, fontWeight: "700", color: "#374151" },
 
   doneBtn: {
     backgroundColor: "#111827",

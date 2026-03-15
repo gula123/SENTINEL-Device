@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setSessionRefreshHandler } from "../services/auth/authSessionBridge";
 import { isAuthExpiredError, notifyAuthExpired, setAuthExpiredHandler } from "../services/auth/authEvents";
 import { AuthProvider, useAuth } from "../state/AuthContext";
+import { warmupBackend } from "../services/api/client";
 
 function AuthSessionBridge({ children }: PropsWithChildren) {
   const { refreshSession, signOut, token } = useAuth();
@@ -64,6 +65,10 @@ export default function AppProviders({ children }: PropsWithChildren) {
         },
       })
   );
+
+  useEffect(() => {
+    warmupBackend();
+  }, []);
 
   return (
     <SafeAreaProvider>

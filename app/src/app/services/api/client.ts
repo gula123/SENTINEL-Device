@@ -2,6 +2,14 @@ import { API_BASE_URL } from "../../config/env";
 import { attemptSessionRefresh } from "../auth/authSessionBridge";
 import { notifyAuthExpired } from "../auth/authEvents";
 
+export const warmupBackend = (): void => {
+  fetch(`${API_BASE_URL}/health`).catch(() => {
+    // fire-and-forget: response and errors are intentionally ignored.
+    // The sole purpose of this call is to trigger a Cloud Run cold-start
+    // so the BE is ready by the time the user authenticates.
+  });
+};
+
 export const getAuthHeaders = (token?: string): Record<string, string> => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

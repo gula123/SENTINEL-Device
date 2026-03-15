@@ -51,6 +51,12 @@ export interface DayResolvedLimits {
     DINNER: number;
     SNACKS: number;
   };
+  mealMacros: {
+    BREAKFAST: { protein: number; carbs: number; fats: number };
+    LUNCH: { protein: number; carbs: number; fats: number };
+    DINNER: { protein: number; carbs: number; fats: number };
+    SNACKS: { protein: number; carbs: number; fats: number };
+  };
 }
 
 const defaultOverall = (settings: UserSettingsDto): MacroLimits => ({
@@ -203,6 +209,28 @@ export const resolveDayLimits = (settings: UserSettingsDto | undefined, date: st
       LUNCH: dayConfig?.meals?.lunch?.calories != null ? Math.round(dayConfig.meals.lunch.calories) : fallback.LUNCH,
       DINNER: dayConfig?.meals?.dinner?.calories != null ? Math.round(dayConfig.meals.dinner.calories) : fallback.DINNER,
       SNACKS: dayConfig?.meals?.snacks?.calories != null ? Math.round(dayConfig.meals.snacks.calories) : fallback.SNACKS,
+    },
+    mealMacros: {
+      BREAKFAST: {
+        protein: dayConfig?.meals?.breakfast?.protein != null ? Math.round(dayConfig.meals.breakfast.protein) : 30,
+        carbs: dayConfig?.meals?.breakfast?.carbs != null ? Math.round(dayConfig.meals.breakfast.carbs) : 75,
+        fats: dayConfig?.meals?.breakfast?.fats != null ? Math.round(dayConfig.meals.breakfast.fats) : 15,
+      },
+      LUNCH: {
+        protein: dayConfig?.meals?.lunch?.protein != null ? Math.round(dayConfig.meals.lunch.protein) : 40,
+        carbs: dayConfig?.meals?.lunch?.carbs != null ? Math.round(dayConfig.meals.lunch.carbs) : 85,
+        fats: dayConfig?.meals?.lunch?.fats != null ? Math.round(dayConfig.meals.lunch.fats) : 20,
+      },
+      DINNER: {
+        protein: dayConfig?.meals?.dinner?.protein != null ? Math.round(dayConfig.meals.dinner.protein) : 35,
+        carbs: dayConfig?.meals?.dinner?.carbs != null ? Math.round(dayConfig.meals.dinner.carbs) : 75,
+        fats: dayConfig?.meals?.dinner?.fats != null ? Math.round(dayConfig.meals.dinner.fats) : 18,
+      },
+      SNACKS: {
+        protein: dayConfig?.meals?.snacks?.protein != null ? Math.round(dayConfig.meals.snacks.protein) : 5,
+        carbs: dayConfig?.meals?.snacks?.carbs != null ? Math.round(dayConfig.meals.snacks.carbs) : 15,
+        fats: dayConfig?.meals?.snacks?.fats != null ? Math.round(dayConfig.meals.snacks.fats) : 3,
+      },
     },
   };
 };

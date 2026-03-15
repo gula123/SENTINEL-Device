@@ -1,10 +1,11 @@
 import dayjs from "dayjs";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
+import type { MainTabParamList } from "../../navigation/MainTabs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNutritionSummary } from "../../hooks/useNutritionSummary";
 import { useFoodLogs } from "../../hooks/useFoodDiary";
@@ -84,41 +85,41 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
               <Text style={styles.mealItemMeta}>{Math.round(item.grams)}g · {Math.round(item.calories)} kcal</Text>
             </View>
           ))}
-
-          <View style={styles.mealMacroRow}>
-            <View style={styles.mealMacro}>
-              <View style={styles.mealMacroLabelRow}>
-                <Text style={[styles.mealMacroDot, { backgroundColor: "#16a34a" }]} />
-                <Text style={styles.mealMacroText}>P {totalProtein}g</Text>
-                {limits ? <Text style={styles.mealMacroLimit}>/{limits.proteinLimit}g</Text> : null}
-              </View>
-              <View style={styles.mealMacroTrack}>
-                <View style={[styles.mealMacroFill, { width: `${Math.round(pP * 100)}%` as any, backgroundColor: "#16a34a" }]} />
-              </View>
-            </View>
-            <View style={styles.mealMacro}>
-              <View style={styles.mealMacroLabelRow}>
-                <Text style={[styles.mealMacroDot, { backgroundColor: "#f59e0b" }]} />
-                <Text style={styles.mealMacroText}>C {totalCarbs}g</Text>
-                {limits ? <Text style={styles.mealMacroLimit}>/{limits.carbsLimit}g</Text> : null}
-              </View>
-              <View style={styles.mealMacroTrack}>
-                <View style={[styles.mealMacroFill, { width: `${Math.round(pC * 100)}%` as any, backgroundColor: "#f59e0b" }]} />
-              </View>
-            </View>
-            <View style={styles.mealMacro}>
-              <View style={styles.mealMacroLabelRow}>
-                <Text style={[styles.mealMacroDot, { backgroundColor: "#6366f1" }]} />
-                <Text style={styles.mealMacroText}>F {totalFats}g</Text>
-                {limits ? <Text style={styles.mealMacroLimit}>/{limits.fatsLimit}g</Text> : null}
-              </View>
-              <View style={styles.mealMacroTrack}>
-                <View style={[styles.mealMacroFill, { width: `${Math.round(pF * 100)}%` as any, backgroundColor: "#6366f1" }]} />
-              </View>
-            </View>
-          </View>
         </>
       )}
+
+      <View style={styles.mealMacroRow}>
+        <View style={styles.mealMacro}>
+          <View style={styles.mealMacroLabelRow}>
+            <Text style={[styles.mealMacroDot, { backgroundColor: "#16a34a" }]} />
+            <Text style={styles.mealMacroText}>P {totalProtein}g</Text>
+            {limits ? <Text style={styles.mealMacroLimit}>/{limits.proteinLimit}g</Text> : null}
+          </View>
+          <View style={styles.mealMacroTrack}>
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pP * 100)}%` as any, backgroundColor: "#16a34a" }]} />
+          </View>
+        </View>
+        <View style={styles.mealMacro}>
+          <View style={styles.mealMacroLabelRow}>
+            <Text style={[styles.mealMacroDot, { backgroundColor: "#f59e0b" }]} />
+            <Text style={styles.mealMacroText}>C {totalCarbs}g</Text>
+            {limits ? <Text style={styles.mealMacroLimit}>/{limits.carbsLimit}g</Text> : null}
+          </View>
+          <View style={styles.mealMacroTrack}>
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pC * 100)}%` as any, backgroundColor: "#f59e0b" }]} />
+          </View>
+        </View>
+        <View style={styles.mealMacro}>
+          <View style={styles.mealMacroLabelRow}>
+            <Text style={[styles.mealMacroDot, { backgroundColor: "#6366f1" }]} />
+            <Text style={styles.mealMacroText}>F {totalFats}g</Text>
+            {limits ? <Text style={styles.mealMacroLimit}>/{limits.fatsLimit}g</Text> : null}
+          </View>
+          <View style={styles.mealMacroTrack}>
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pF * 100)}%` as any, backgroundColor: "#6366f1" }]} />
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -130,6 +131,7 @@ function DayView({
   date,
   width,
   height,
+  shouldFetch,
   navigation,
   token,
   signOut,
@@ -137,15 +139,16 @@ function DayView({
   date: string;
   width: number;
   height: number;
+  shouldFetch: boolean;
   navigation: NativeStackNavigationProp<MainStackParamList>;
   token: string | null;
   signOut: () => void;
 }) {
   const queryClient = useQueryClient();
   const [showFillOptions, setShowFillOptions] = useState(false);
-  const { data, isLoading, isError, error, refetch } = useNutritionSummary(date);
-  const logsQuery = useFoodLogs(date);
-  const vacation = useVacationDay(date);
+  const { data, isLoading, isError, error, refetch } = useNutritionSummary(date, { enabled: shouldFetch });
+  const logsQuery = useFoodLogs(date, { enabled: shouldFetch });
+  const vacation = useVacationDay(date, { enabled: shouldFetch });
   const settingsQuery = useUserSettings();
 
   const totals = useMemo(() => {
@@ -329,7 +332,11 @@ function DayView({
             key={meal}
             meal={meal}
             items={grouped[meal]}
-            limits={data ? { proteinLimit: data.proteinLimit, carbsLimit: data.carbsLimit, fatsLimit: data.fatsLimit } : null}
+            limits={data ? {
+              proteinLimit: dayLimits.mealMacros[meal].protein,
+              carbsLimit: dayLimits.mealMacros[meal].carbs,
+              fatsLimit: dayLimits.mealMacros[meal].fats,
+            } : null}
             calLimit={dayLimits.mealCalories[meal]}
             onLogPress={() => navigation.navigate("LogFood", { meal, date })}
           />
@@ -343,6 +350,7 @@ function DayView({
 export default function HomeScreen() {
   const { user, signOut, token } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const route = useRoute<RouteProp<MainTabParamList, "Diary">>();
   const { width } = useWindowDimensions();
   const todayStr = dayjs().format("YYYY-MM-DD");
 
@@ -358,14 +366,16 @@ export default function HomeScreen() {
   const todayIndex = DAYS_RANGE;
 
   const [activeIndex, setActiveIndex] = useState(todayIndex);
+  const [initialIndex, setInitialIndex] = useState(todayIndex);
+  const [listSeed, setListSeed] = useState(0);
   const [listHeight, setListHeight] = useState(0);
+  const [focusTarget, setFocusTarget] = useState<{ date: string; token: number } | null>(null);
   const listRef = useRef<FlatList<string>>(null);
   const activeDate = allDates[activeIndex] ?? todayStr;
   const isToday = activeDate === todayStr;
 
   const goToToday = () => {
     listRef.current?.scrollToIndex({ index: todayIndex, animated: true });
-    setActiveIndex(todayIndex);
   };
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
@@ -380,6 +390,32 @@ export default function HomeScreen() {
     offset: width * index,
     index,
   });
+
+  useEffect(() => {
+    const targetDate = route.params?.date;
+    if (!targetDate) {
+      return;
+    }
+
+    const targetIndex = allDates.indexOf(targetDate);
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const token = route.params?.focusToken ?? Date.now();
+    setFocusTarget({ date: targetDate, token });
+
+    // Re-mount FlatList at target index to avoid virtualization race conditions.
+    setInitialIndex(targetIndex);
+    setActiveIndex(targetIndex);
+    setListSeed((value) => value + 1);
+  }, [route.params?.date, route.params?.focusToken, allDates]);
+
+  useEffect(() => {
+    if (focusTarget && activeDate === focusTarget.date) {
+      setFocusTarget(null);
+    }
+  }, [activeDate, focusTarget]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -402,17 +438,26 @@ export default function HomeScreen() {
       </View>
 
       <FlatList
+        key={`diary-${listSeed}-${initialIndex}`}
         ref={listRef}
         data={allDates}
         keyExtractor={(item) => item}
-        renderItem={({ item: date }) => (
-          <DayView date={date} width={width} height={listHeight} navigation={navigation} token={token} signOut={signOut} />
+        renderItem={({ item: date, index }) => (
+          <DayView
+            date={date}
+            width={width}
+            height={listHeight}
+            shouldFetch={date === activeDate || Math.abs(index - activeIndex) <= 1 || focusTarget?.date === date}
+            navigation={navigation}
+            token={token}
+            signOut={signOut}
+          />
         )}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         getItemLayout={getItemLayout}
-        initialScrollIndex={todayIndex}
+        initialScrollIndex={initialIndex}
         onViewableItemsChanged={onViewableItemsChanged.current}
         viewabilityConfig={viewabilityConfig.current}
         windowSize={5}
@@ -420,6 +465,15 @@ export default function HomeScreen() {
         removeClippedSubviews={false}
         style={{ flex: 1 }}
         onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          const safeIndex = Math.max(0, Math.min(index, allDates.length - 1));
+          const estimatedItemLength = averageItemLength > 0 ? averageItemLength : width;
+          listRef.current?.scrollToOffset({ offset: safeIndex * estimatedItemLength, animated: false });
+
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({ index: safeIndex, animated: false });
+          }, 80);
+        }}
       />
     </SafeAreaView>
   );

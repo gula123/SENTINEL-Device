@@ -6,7 +6,7 @@ import ProgressScreen from "../screens/progress/ProgressScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 
 export type MainTabParamList = {
-  Diary: undefined;
+  Diary: { date?: string; focusToken?: number } | undefined;
   Progress: undefined;
   Settings: undefined;
 };
