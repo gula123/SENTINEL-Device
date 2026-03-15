@@ -7,8 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import type { MainTabParamList } from "../../navigation/MainTabs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNutritionSummary } from "../../hooks/useNutritionSummary";
-import { useFoodLogs } from "../../hooks/useFoodDiary";
+import { useDiaryDay } from "../../hooks/useDiaryDay";
 import { useVacationDay } from "../../hooks/useVacationDay";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import { type FoodLogDto, type MealType } from "../../services/food/foodLogsApi";
@@ -163,32 +162,37 @@ function DayView({
 }) {
   const queryClient = useQueryClient();
   const [showFillOptions, setShowFillOptions] = useState(false);
-  const { data, isLoading, isError, error, refetch } = useNutritionSummary(date, { enabled: shouldFetch });
-  const logsQuery = useFoodLogs(date, { enabled: shouldFetch });
-  const vacation = useVacationDay(date, { enabled: shouldFetch });
+  const diaryDayQuery = useDiaryDay(date, { enabled: shouldFetch });
+  const vacation = useVacationDay(date, { enabled: false });
   const settingsQuery = useUserSettings();
+  const summary = diaryDayQuery.data?.summary;
+  const logs = diaryDayQuery.data?.logs || [];
+  const isVacationDay = diaryDayQuery.data?.vacation ?? false;
 
   const totals = useMemo(() => {
-    const items = logsQuery.data || [];
+    const items = logs;
     return {
       calories: items.reduce((s, i) => s + (i.calories || 0), 0),
       protein:  items.reduce((s, i) => s + (i.protein  || 0), 0),
       carbs:    items.reduce((s, i) => s + (i.carbs    || 0), 0),
       fats:     items.reduce((s, i) => s + (i.fats     || 0), 0),
     };
-  }, [logsQuery.data]);
+  }, [logs]);
 
   const quickFillMutation = useMutation({
     mutationFn: async (multiplier: number) => {
       if (!token) throw new Error("AUTH_REQUIRED");
-      if (vacation.isVacationDay) throw new Error("Quick Fill is disabled on vacation days");
+      if (isVacationDay) throw new Error("Quick Fill is disabled on vacation days");
       const limits = resolveDayLimits(settingsQuery.data, date);
       return applyQuickFillDay({ token, date, multiplier, totals, limits });
     },
     onSuccess: async (result, multiplier) => {
+      const yearMonth = dayjs(date).format("YYYY-MM");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["foodLogs", date] }),
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] }),
+        queryClient.invalidateQueries({ queryKey: ["diaryDay", date] }),
+        queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
       ]);
       if (result.skipped) {
         Alert.alert("Quick Fill", `Already at or above ${Math.round(multiplier * 100)}% target.`);
@@ -214,20 +218,20 @@ function DayView({
 
   const grouped = useMemo(() => {
     const byMeal: Record<MealType, FoodLogDto[]> = { BREAKFAST: [], LUNCH: [], DINNER: [], SNACKS: [] };
-    (logsQuery.data || []).forEach((item) => {
+    logs.forEach((item) => {
       const meal = (item.mealType || "SNACKS") as MealType;
       byMeal[meal].push(item);
     });
     return byMeal;
-  }, [logsQuery.data]);
+  }, [logs]);
 
   const dayLimits = useMemo(() => resolveDayLimits(settingsQuery.data, date), [settingsQuery.data, date]);
 
-  const isAuthExpired = error instanceof Error && error.message === "AUTH_EXPIRED";
-  const calorieGoal = data ? data.caloriesConsumed + data.caloriesRemaining : 0;
-  const calorieProgress = calorieGoal > 0 ? data!.caloriesConsumed / calorieGoal : 0;
+  const isAuthExpired = diaryDayQuery.error instanceof Error && diaryDayQuery.error.message === "AUTH_EXPIRED";
+  const calorieGoal = summary ? summary.caloriesConsumed + summary.caloriesRemaining : 0;
+  const calorieProgress = calorieGoal > 0 ? summary!.caloriesConsumed / calorieGoal : 0;
   const calorieProgressBar = Math.min(1, calorieProgress);
-  const calorieColor = data ? resolveLimitColor(data.caloriesConsumed, calorieGoal) : LIMIT_OK_COLOR;
+  const calorieColor = summary ? resolveLimitColor(summary.caloriesConsumed, calorieGoal) : LIMIT_OK_COLOR;
 
   return (
     <ScrollView
@@ -243,22 +247,22 @@ function DayView({
           disabled={vacation.isLoading || vacation.isToggling}
           style={({ pressed }) => [
             styles.vacationChip,
-            vacation.isVacationDay && styles.vacationChipActive,
+            isVacationDay && styles.vacationChipActive,
             pressed && styles.buttonPressed,
           ]}
         >
-          <Text style={[styles.vacationChipText, vacation.isVacationDay && styles.vacationChipTextActive]}>
-            {vacation.isVacationDay ? "🏖️ Vacation" : "🏖️ Off day"}
+          <Text style={[styles.vacationChipText, isVacationDay && styles.vacationChipTextActive]}>
+            {isVacationDay ? "🏖️ Vacation" : "🏖️ Off day"}
           </Text>
         </Pressable>
 
         <Pressable
           onPress={() => setShowFillOptions((v) => !v)}
-          disabled={vacation.isVacationDay || quickFillMutation.isPending}
+          disabled={isVacationDay || quickFillMutation.isPending}
           style={({ pressed }) => [
             styles.quickFillTrigger,
             showFillOptions && styles.quickFillTriggerActive,
-            (vacation.isVacationDay || quickFillMutation.isPending) && styles.disabledChip,
+            (isVacationDay || quickFillMutation.isPending) && styles.disabledChip,
             pressed && styles.buttonPressed,
           ]}
         >
@@ -284,18 +288,18 @@ function DayView({
         </View>
       ) : null}
 
-      {isLoading ? (
+      {diaryDayQuery.isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color="#16a34a" />
           <Text style={styles.loadingText}>Loading your summary…</Text>
         </View>
       ) : null}
 
-      {isError ? (
+      {diaryDayQuery.isError ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorTitle}>Could not load daily summary</Text>
           <Text style={styles.errorText}>
-            {isAuthExpired ? "Session expired. Please sign in again." : (error as Error).message}
+            {isAuthExpired ? "Session expired. Please sign in again." : (diaryDayQuery.error as Error).message}
           </Text>
           <View style={styles.row}>
             {isAuthExpired ? (
@@ -305,7 +309,7 @@ function DayView({
                 <Text style={styles.secondaryButtonText}>Sign in again</Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={() => refetch()} accessibilityRole="button"
+            <Pressable onPress={() => diaryDayQuery.refetch()} accessibilityRole="button"
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             >
               <Text style={styles.primaryButtonText}>Retry</Text>
@@ -314,12 +318,12 @@ function DayView({
         </View>
       ) : null}
 
-      {data ? (
+      {summary ? (
         <>
           <View style={styles.calorieCard}>
             <Text style={styles.calorieLabel}>Daily Calories</Text>
             <View style={styles.calorieRow}>
-              <Text style={[styles.calorieConsumed, { color: calorieColor }]}>{data.caloriesConsumed}</Text>
+              <Text style={[styles.calorieConsumed, { color: calorieColor }]}>{summary.caloriesConsumed}</Text>
               <Text style={styles.calorieSlash}> / </Text>
               <Text style={styles.calorieGoalText}>{calorieGoal}</Text>
               <Text style={styles.calorieUnit}> kcal</Text>
@@ -328,22 +332,22 @@ function DayView({
               <View style={[styles.progressFill, { width: `${Math.round(calorieProgressBar * 100)}%` as any, backgroundColor: calorieColor }]} />
             </View>
             <View style={styles.calorieFooter}>
-              <Text style={styles.remainingText}>{data.caloriesRemaining} kcal remaining</Text>
+              <Text style={styles.remainingText}>{summary.caloriesRemaining} kcal remaining</Text>
               <Text style={[styles.progressPct, { color: calorieColor }]}>{Math.round(calorieProgress * 100)}%</Text>
             </View>
           </View>
 
           <Text style={styles.sectionTitle}>Macronutrients</Text>
           <View style={styles.macroRow}>
-            <MacroCard label="Protein" value={data.protein} limit={data.proteinLimit} invertColorByLimit />
-            <MacroCard label="Carbs"   value={data.carbs}   limit={data.carbsLimit} />
-            <MacroCard label="Fats"    value={data.fats}    limit={data.fatsLimit} />
+            <MacroCard label="Protein" value={summary.protein} limit={summary.proteinLimit} invertColorByLimit />
+            <MacroCard label="Carbs"   value={summary.carbs}   limit={summary.carbsLimit} />
+            <MacroCard label="Fats"    value={summary.fats}    limit={summary.fatsLimit} />
           </View>
         </>
       ) : null}
 
       <Text style={styles.sectionTitle}>Meals</Text>
-      {logsQuery.isLoading ? (
+      {diaryDayQuery.isLoading ? (
         <ActivityIndicator size="small" color="#16a34a" />
       ) : (
         MEAL_ORDER.map((meal) => (
@@ -351,7 +355,7 @@ function DayView({
             key={meal}
             meal={meal}
             items={grouped[meal]}
-            limits={data ? {
+            limits={summary ? {
               proteinLimit: dayLimits.mealMacros[meal].protein,
               carbsLimit: dayLimits.mealMacros[meal].carbs,
               fatsLimit: dayLimits.mealMacros[meal].fats,

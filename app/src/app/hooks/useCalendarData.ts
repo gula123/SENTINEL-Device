@@ -14,5 +14,6 @@ export const useCalendarData = (yearMonth: string) => {
       return fetchCalendarData(token, yearMonth);
     },
     enabled: Boolean(token),
+    staleTime: 5 * 60_000,
   });
 };

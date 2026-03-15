@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addFoodLog, deleteFoodLog, fetchFoodLogs, MealType, updateFoodLogGrams } from "../services/food/foodLogsApi";
 import { useAuth } from "../state/AuthContext";
@@ -15,12 +16,14 @@ export const useFoodLogs = (date: string, options?: { enabled?: boolean }) => {
       return fetchFoodLogs(token, date);
     },
     enabled: Boolean(token) && enabled,
+    staleTime: 30_000,
   });
 };
 
 export const useAddFoodLog = (date: string) => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const yearMonth = dayjs(date).format("YYYY-MM");
 
   return useMutation({
     mutationFn: async (payload: {
@@ -42,6 +45,8 @@ export const useAddFoodLog = (date: string) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["foodLogs", date] }),
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] }),
+        queryClient.invalidateQueries({ queryKey: ["diaryDay", date] }),
+        queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
       ]);
     },
   });
@@ -50,6 +55,7 @@ export const useAddFoodLog = (date: string) => {
 export const useUpdateFoodLog = (date: string) => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const yearMonth = dayjs(date).format("YYYY-MM");
 
   return useMutation({
     mutationFn: async ({ logId, grams }: { logId: number; grams: number }) => {
@@ -62,6 +68,8 @@ export const useUpdateFoodLog = (date: string) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["foodLogs", date] }),
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] }),
+        queryClient.invalidateQueries({ queryKey: ["diaryDay", date] }),
+        queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
       ]);
     },
   });
@@ -70,6 +78,7 @@ export const useUpdateFoodLog = (date: string) => {
 export const useDeleteFoodLog = (date: string) => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const yearMonth = dayjs(date).format("YYYY-MM");
 
   return useMutation({
     mutationFn: async (logId: number) => {
@@ -82,6 +91,8 @@ export const useDeleteFoodLog = (date: string) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["foodLogs", date] }),
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] }),
+        queryClient.invalidateQueries({ queryKey: ["diaryDay", date] }),
+        queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
       ]);
     },
   });
