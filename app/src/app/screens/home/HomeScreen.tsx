@@ -19,8 +19,23 @@ import { useAuth } from "../../state/AuthContext";
 const MEAL_ORDER: MealType[] = ["BREAKFAST", "LUNCH", "DINNER", "SNACKS"];
 const MEAL_LABEL: Record<MealType, string> = { BREAKFAST: "Breakfast", LUNCH: "Lunch", DINNER: "Dinner", SNACKS: "Snacks" };
 const MEAL_ICON: Record<MealType, string> = { BREAKFAST: "☀️", LUNCH: "🌤️", DINNER: "🌙", SNACKS: "🍎" };
+const LIMIT_OK_COLOR = "#16a34a";
+const LIMIT_BAD_COLOR = "#dc2626";
 
-function MacroCard({ label, value, limit, color }: { label: string; value: number; limit: number; color: string }) {
+function resolveLimitColor(value: number, limit: number, invert = false): string {
+  if (limit <= 0) {
+    return LIMIT_OK_COLOR;
+  }
+
+  if (invert) {
+    return value >= limit ? LIMIT_OK_COLOR : LIMIT_BAD_COLOR;
+  }
+
+  return value > limit ? LIMIT_BAD_COLOR : LIMIT_OK_COLOR;
+}
+
+function MacroCard({ label, value, limit, invertColorByLimit = false }: { label: string; value: number; limit: number; invertColorByLimit?: boolean }) {
+  const color = resolveLimitColor(value, limit, invertColorByLimit);
   const pct = limit > 0 ? Math.min(1, value / limit) : 0;
   return (
     <View style={styles.macroCard}>
@@ -51,8 +66,10 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
   const pF = limits && limits.fatsLimit    > 0 ? Math.min(1, totalFats    / limits.fatsLimit)    : 0;
 
   const calPct  = calLimit && calLimit > 0 ? totalCal / calLimit : 0;
-  const calOver = calPct > 1;
-  const calBarColor = calPct > 1 ? "#dc2626" : calPct >= 0.8 ? "#f59e0b" : "#16a34a";
+  const calColor = resolveLimitColor(totalCal, calLimit ?? 0);
+  const proteinColor = resolveLimitColor(totalProtein, limits?.proteinLimit ?? 0, true);
+  const carbsColor = resolveLimitColor(totalCarbs, limits?.carbsLimit ?? 0);
+  const fatsColor = resolveLimitColor(totalFats, limits?.fatsLimit ?? 0);
 
   return (
     <Pressable
@@ -64,12 +81,12 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
         <Text style={styles.mealIcon}>{MEAL_ICON[meal]}</Text>
         <Text style={styles.mealName}>{MEAL_LABEL[meal]}</Text>
         <View style={styles.mealCalBlock}>
-          <Text style={[styles.mealCal, calOver && styles.mealCalOver]}>
+          <Text style={[styles.mealCal, { color: calColor }]}>
             {Math.round(totalCal)}{calLimit ? ` / ${calLimit}` : ""} kcal
           </Text>
           {calLimit ? (
             <View style={styles.mealCalTrack}>
-              <View style={[styles.mealCalFill, { width: `${Math.min(100, Math.round(calPct * 100))}%` as any, backgroundColor: calBarColor }]} />
+              <View style={[styles.mealCalFill, { width: `${Math.min(100, Math.round(calPct * 100))}%` as any, backgroundColor: calColor }]} />
             </View>
           ) : null}
         </View>
@@ -91,32 +108,32 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
       <View style={styles.mealMacroRow}>
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
-            <Text style={[styles.mealMacroDot, { backgroundColor: "#16a34a" }]} />
+            <Text style={[styles.mealMacroDot, { backgroundColor: proteinColor }]} />
             <Text style={styles.mealMacroText}>P {totalProtein}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.proteinLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
-            <View style={[styles.mealMacroFill, { width: `${Math.round(pP * 100)}%` as any, backgroundColor: "#16a34a" }]} />
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pP * 100)}%` as any, backgroundColor: proteinColor }]} />
           </View>
         </View>
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
-            <Text style={[styles.mealMacroDot, { backgroundColor: "#f59e0b" }]} />
+            <Text style={[styles.mealMacroDot, { backgroundColor: carbsColor }]} />
             <Text style={styles.mealMacroText}>C {totalCarbs}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.carbsLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
-            <View style={[styles.mealMacroFill, { width: `${Math.round(pC * 100)}%` as any, backgroundColor: "#f59e0b" }]} />
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pC * 100)}%` as any, backgroundColor: carbsColor }]} />
           </View>
         </View>
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
-            <Text style={[styles.mealMacroDot, { backgroundColor: "#6366f1" }]} />
+            <Text style={[styles.mealMacroDot, { backgroundColor: fatsColor }]} />
             <Text style={styles.mealMacroText}>F {totalFats}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.fatsLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
-            <View style={[styles.mealMacroFill, { width: `${Math.round(pF * 100)}%` as any, backgroundColor: "#6366f1" }]} />
+            <View style={[styles.mealMacroFill, { width: `${Math.round(pF * 100)}%` as any, backgroundColor: fatsColor }]} />
           </View>
         </View>
       </View>
@@ -208,7 +225,9 @@ function DayView({
 
   const isAuthExpired = error instanceof Error && error.message === "AUTH_EXPIRED";
   const calorieGoal = data ? data.caloriesConsumed + data.caloriesRemaining : 0;
-  const calorieProgress = calorieGoal > 0 ? Math.min(1, data!.caloriesConsumed / calorieGoal) : 0;
+  const calorieProgress = calorieGoal > 0 ? data!.caloriesConsumed / calorieGoal : 0;
+  const calorieProgressBar = Math.min(1, calorieProgress);
+  const calorieColor = data ? resolveLimitColor(data.caloriesConsumed, calorieGoal) : LIMIT_OK_COLOR;
 
   return (
     <ScrollView
@@ -300,25 +319,25 @@ function DayView({
           <View style={styles.calorieCard}>
             <Text style={styles.calorieLabel}>Daily Calories</Text>
             <View style={styles.calorieRow}>
-              <Text style={styles.calorieConsumed}>{data.caloriesConsumed}</Text>
+              <Text style={[styles.calorieConsumed, { color: calorieColor }]}>{data.caloriesConsumed}</Text>
               <Text style={styles.calorieSlash}> / </Text>
               <Text style={styles.calorieGoalText}>{calorieGoal}</Text>
               <Text style={styles.calorieUnit}> kcal</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.round(calorieProgress * 100)}%` as any }]} />
+              <View style={[styles.progressFill, { width: `${Math.round(calorieProgressBar * 100)}%` as any, backgroundColor: calorieColor }]} />
             </View>
             <View style={styles.calorieFooter}>
               <Text style={styles.remainingText}>{data.caloriesRemaining} kcal remaining</Text>
-              <Text style={styles.progressPct}>{Math.round(calorieProgress * 100)}%</Text>
+              <Text style={[styles.progressPct, { color: calorieColor }]}>{Math.round(calorieProgress * 100)}%</Text>
             </View>
           </View>
 
           <Text style={styles.sectionTitle}>Macronutrients</Text>
           <View style={styles.macroRow}>
-            <MacroCard label="Protein" value={data.protein} limit={data.proteinLimit} color="#16a34a" />
-            <MacroCard label="Carbs"   value={data.carbs}   limit={data.carbsLimit}   color="#f59e0b" />
-            <MacroCard label="Fats"    value={data.fats}    limit={data.fatsLimit}    color="#6366f1" />
+            <MacroCard label="Protein" value={data.protein} limit={data.proteinLimit} invertColorByLimit />
+            <MacroCard label="Carbs"   value={data.carbs}   limit={data.carbsLimit} />
+            <MacroCard label="Fats"    value={data.fats}    limit={data.fatsLimit} />
           </View>
         </>
       ) : null}
@@ -631,7 +650,6 @@ const styles = StyleSheet.create({
   mealName: { flex: 1, fontSize: 14, fontWeight: "700", color: "#111827" },
   mealCalBlock: { alignItems: "flex-end", gap: 3 },
   mealCal: { fontSize: 13, fontWeight: "600", color: "#16a34a" },
-  mealCalOver: { color: "#dc2626" },
   mealCalTrack: { width: 80, height: 4, backgroundColor: "#f3f4f6", borderRadius: 99, overflow: "hidden" },
   mealCalFill: { height: "100%" as any, borderRadius: 99 },
   mealEmpty: { fontSize: 12, color: "#9ca3af", fontStyle: "italic" },
