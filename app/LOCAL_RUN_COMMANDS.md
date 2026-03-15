@@ -7,26 +7,27 @@ $env:SPRING_PROFILES_ACTIVE="local"
 ./mvnw spring-boot:run
 ```
 
-## 2) Start app on Android emulator (terminal 2)
+## 2) Start emulator (terminal 2)
 ```powershell
-cd "e:\Code\SENTINEL\SENTINEL-Device\app"
-npm run android
+$adb = "C:\Users\gulac\AppData\Local\Android\Sdk\platform-tools\adb.exe"
+$emu = "C:\Users\gulac\AppData\Local\Android\Sdk\emulator\emulator.exe"
+
+# Restart adb server to avoid "device offline" protocol issues.
+& $adb kill-server
+& $adb start-server
+
+# Start emulator in this terminal and keep it running.
+& $emu -avd Pixel_9 -gpu swiftshader_indirect -no-snapshot -no-snapshot-load -no-snapshot-save
 ```
 
-## 3) If Expo/Google screen is blank or broken (GPU issue)
+## 3) Wait until emulator is fully online (terminal 3)
 ```powershell
-& "C:\Users\gulac\AppData\Local\Android\Sdk\platform-tools\adb.exe" emu kill
-& "C:\Users\gulac\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd Pixel_9 -gpu swiftshader_indirect -no-snapshot -no-snapshot-load -no-snapshot-save
-cd "e:\Code\SENTINEL\SENTINEL-Device\app"
-npx expo start -c --android
+$adb = "C:\Users\gulac\AppData\Local\Android\Sdk\platform-tools\adb.exe"
+& $adb wait-for-device
+& $adb devices
 ```
 
-## 4) Optional: list available AVD names
-```powershell
-& "C:\Users\gulac\AppData\Local\Android\Sdk\emulator\emulator.exe" -list-avds
-```
-
-## 5) Full native build (required for Google Sign-In)
+## 4) For Android (terminal 4)
 ```powershell
 cd "e:\Code\SENTINEL\SENTINEL-Device\app"
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
@@ -35,29 +36,8 @@ $env:ANDROID_SDK_ROOT = "C:\Users\gulac\AppData\Local\Android\Sdk"
 npx expo run:android
 ```
 
-## 6) For Web
+## 5) For Web
 ```
+cd "e:\Code\SENTINEL\SENTINEL-Device\app"
 npx expo start --web
 ```
-
-## 7) Android bundle
-```
-$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME="C:\Users\gulac\AppData\Local\Android\Sdk"; $env:EXPO_PUBLIC_API_URL="https://api.gulasensei.hu/api"; cd "e:\Code\SENTINEL\SENTINEL-Device\app\android"; .\gradlew.bat :app:assembleRelease :app:bundleRelease
-
-```
-
-## 8) If Google login shows DEVELOPER_ERROR (Android)
-```powershell
-cd "e:\Code\SENTINEL\SENTINEL-Device\app\android"
-$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
-$env:ANDROID_HOME="C:\Users\gulac\AppData\Local\Android\Sdk"
-$env:ANDROID_SDK_ROOT="C:\Users\gulac\AppData\Local\Android\Sdk"
-.\gradlew.bat :app:signingReport
-```
-
-Expected for local debug:
-- Package: hu.gurul.health.app
-- Keystore: C:\Users\gulac\.android\debug.keystore
-
-If signingReport shows a different keystore/SHA1 than Google Console Android OAuth client,
-Google Sign-In will fail with DEVELOPER_ERROR.

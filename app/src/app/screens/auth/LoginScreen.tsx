@@ -4,7 +4,9 @@ import * as AuthSession from "expo-auth-session";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GOOGLE_OAUTH } from "../../config/env";
+import { API_BASE_URL, GOOGLE_OAUTH } from "../../config/env";
+import { getMobileSessionMetadata } from "../../services/auth/deviceSession";
+import { configureNativeGoogleSignIn, getNativeGoogleSignIn } from "../../services/auth/nativeGoogleSession";
 import { loginWithGoogleToken } from "../../services/auth/authApi";
 import { useAuth } from "../../state/AuthContext";
 
@@ -15,11 +17,6 @@ WebBrowser.maybeCompleteAuthSession();
 const WEB_REDIRECT_URI = Platform.OS === "web" ? AuthSession.makeRedirectUri() : "";
 if (Platform.OS === "web") console.log("[Auth] Redirect URI:", WEB_REDIRECT_URI);
 
-const getNativeSignIn = () => {
-  if (Platform.OS === "web") return null;
-  return require("@react-native-google-signin/google-signin");
-};
-
 export default function LoginScreen() {
   const { saveSession } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +24,12 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (Platform.OS !== "web") {
-      const { GoogleSignin } = getNativeSignIn();
-      GoogleSignin.configure({ webClientId: GOOGLE_OAUTH.webClientId, offlineAccess: false });
+      configureNativeGoogleSignIn();
+      console.log("[Auth][Android] Config", {
+        apiBaseUrl: API_BASE_URL,
+        hasWebClientId: !!GOOGLE_OAUTH.webClientId,
+        hasAndroidClientId: !!GOOGLE_OAUTH.androidClientId,
+      });
     }
   }, []);
 
@@ -68,7 +69,12 @@ export default function LoginScreen() {
         if (!idToken && response.params?.code && request?.codeVerifier) {
           console.log("[Auth] Auto-exchange missing idToken, trying manual PKCE exchange...");
           const tokenResponse = await AuthSession.exchangeCodeAsync(
-            { clientId: GOOGLE_OAUTH.webClientId, code: response.params.code, redirectUri: WEB_REDIRECT_URI, codeVerifier: request.codeVerifier },
+            {
+              clientId: GOOGLE_OAUTH.webClientId,
+              code: response.params.code,
+              redirectUri: WEB_REDIRECT_URI,
+              extraParams: { code_verifier: request.codeVerifier },
+            },
             { tokenEndpoint: "https://oauth2.googleapis.com/token" }
           );
           idToken = tokenResponse.idToken ?? undefined;
@@ -76,8 +82,8 @@ export default function LoginScreen() {
         }
 
         if (!idToken) throw new Error("Google did not return an ID token");
-        const data = await loginWithGoogleToken(idToken);
-        await saveSession(data.token, { userId: data.userId, email: data.email, name: data.name, profilePictureUrl: data.profilePictureUrl });
+        const data = await loginWithGoogleToken(idToken, Platform.OS === "web" ? undefined : await getMobileSessionMetadata());
+        await saveSession(data.token, { userId: data.userId, email: data.email, name: data.name, profilePictureUrl: data.profilePictureUrl }, data.refreshToken ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Sign-in failed");
       } finally {
@@ -93,18 +99,28 @@ export default function LoginScreen() {
       promptAsync().catch((err: any) => setError(err?.message ?? "Sign-in failed"));
       return;
     }
-    const { GoogleSignin, statusCodes } = getNativeSignIn();
+    configureNativeGoogleSignIn();
+    const nativeGoogleSignIn = getNativeGoogleSignIn();
+    if (!nativeGoogleSignIn) {
+      setError("Google Sign-In is unavailable on this platform");
+      return;
+    }
+
+    const { GoogleSignin, statusCodes } = nativeGoogleSignIn;
     try {
       setLoading(true);
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
       if (!tokens.idToken) throw new Error("Google did not return an ID token");
-      const data = await loginWithGoogleToken(tokens.idToken);
-      await saveSession(data.token, { userId: data.userId, email: data.email, name: data.name, profilePictureUrl: data.profilePictureUrl });
+      const data = await loginWithGoogleToken(tokens.idToken, await getMobileSessionMetadata());
+      await saveSession(data.token, { userId: data.userId, email: data.email, name: data.name, profilePictureUrl: data.profilePictureUrl }, data.refreshToken ?? null);
     } catch (err: any) {
       if (err.code === statusCodes?.SIGN_IN_CANCELLED) return;
-      setError(err instanceof Error ? err.message : "Sign-in failed");
+      const code = err?.code ? String(err.code) : "unknown";
+      const msg = err instanceof Error ? err.message : (err?.message || "Sign-in failed");
+      console.log("[Auth][Android] signIn error", { code, message: msg, apiBaseUrl: API_BASE_URL });
+      setError(`Android sign-in failed (${code}): ${msg}`);
     } finally {
       setLoading(false);
     }
