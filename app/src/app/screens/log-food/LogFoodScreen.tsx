@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { useAddFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
+import { useAddFoodLog, useDeleteFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import {
   createCustomFood,
@@ -49,6 +49,21 @@ const mealKeyByType = {
   SNACKS: "snacks",
 } as const;
 
+const LIMIT_OK_COLOR = "#16a34a";
+const LIMIT_BAD_COLOR = "#dc2626";
+
+function resolveLimitColor(value: number, limit: number, invert = false): string {
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return LIMIT_OK_COLOR;
+  }
+
+  if (invert) {
+    return value >= limit ? LIMIT_OK_COLOR : LIMIT_BAD_COLOR;
+  }
+
+  return value > limit ? LIMIT_BAD_COLOR : LIMIT_OK_COLOR;
+}
+
 type Props = NativeStackScreenProps<MainStackParamList, "LogFood">;
 
 export default function LogFoodScreen({ route, navigation }: Props) {
@@ -74,6 +89,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
   const updateMutation = useUpdateFoodLog(date);
+  const deleteMutation = useDeleteFoodLog(date);
   const logsQuery = useFoodLogs(date);
   const settingsQuery = useUserSettings();
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
@@ -117,6 +133,36 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     };
   }, [selectedFood, grams]);
 
+  const mealSummaryColors = useMemo(() => {
+    return {
+      calories: resolveLimitColor(consumed.calories, mealLimits.calories),
+      protein: resolveLimitColor(consumed.protein, mealLimits.protein, true),
+      carbs: resolveLimitColor(consumed.carbs, mealLimits.carbs),
+      fats: resolveLimitColor(consumed.fats, mealLimits.fats),
+    };
+  }, [consumed, mealLimits]);
+
+  const selectedPreviewTotals = useMemo(() => {
+    if (!selectedFoodPreview) return null;
+
+    const totals = {
+      calories: consumed.calories + selectedFoodPreview.calories,
+      protein: consumed.protein + selectedFoodPreview.protein,
+      carbs: consumed.carbs + selectedFoodPreview.carbs,
+      fats: consumed.fats + selectedFoodPreview.fats,
+    };
+
+    return {
+      totals,
+      colors: {
+        calories: resolveLimitColor(totals.calories, mealLimits.calories),
+        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
+        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
+        fats: resolveLimitColor(totals.fats, mealLimits.fats),
+      },
+    };
+  }, [selectedFoodPreview, consumed, mealLimits]);
+
   const customFoodPreview = useMemo(() => {
     const parsedGrams = Number(customGrams);
     const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
@@ -133,6 +179,27 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       fats: Math.round(fats * factor * 10) / 10,
     };
   }, [customCalories, customProtein, customCarbs, customFats, customGrams]);
+
+  const customPreviewTotals = useMemo(() => {
+    if (!customFoodPreview) return null;
+
+    const totals = {
+      calories: consumed.calories + customFoodPreview.calories,
+      protein: consumed.protein + customFoodPreview.protein,
+      carbs: consumed.carbs + customFoodPreview.carbs,
+      fats: consumed.fats + customFoodPreview.fats,
+    };
+
+    return {
+      totals,
+      colors: {
+        calories: resolveLimitColor(totals.calories, mealLimits.calories),
+        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
+        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
+        fats: resolveLimitColor(totals.fats, mealLimits.fats),
+      },
+    };
+  }, [customFoodPreview, consumed, mealLimits]);
 
   const editingLog = useMemo(
     () => currentMealLogs.find((item) => item.id === editingLogId) || null,
@@ -154,6 +221,27 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       fats: Math.round((editingLog.fats || 0) * factor * 10) / 10,
     };
   }, [editingLog, editingGrams]);
+
+  const editingPreviewTotals = useMemo(() => {
+    if (!editingLog || !editingPreview) return null;
+
+    const totals = {
+      calories: consumed.calories - (editingLog.calories || 0) + editingPreview.calories,
+      protein: consumed.protein - (editingLog.protein || 0) + editingPreview.protein,
+      carbs: consumed.carbs - (editingLog.carbs || 0) + editingPreview.carbs,
+      fats: consumed.fats - (editingLog.fats || 0) + editingPreview.fats,
+    };
+
+    return {
+      totals,
+      colors: {
+        calories: resolveLimitColor(totals.calories, mealLimits.calories),
+        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
+        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
+        fats: resolveLimitColor(totals.fats, mealLimits.fats),
+      },
+    };
+  }, [editingLog, editingPreview, consumed, mealLimits]);
 
   const aiMutation = useMutation({
     mutationFn: async (name: string): Promise<AiFoodEstimate> => {
@@ -310,6 +398,32 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const onDeleteLog = () => {
+    if (!editingLog) return;
+
+    Alert.alert(
+      "Delete food",
+      `Delete ${editingLog.foodName} from this meal?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteMutation.mutateAsync(editingLog.id);
+              invalidate();
+              onCancelEditLog();
+              Alert.alert("Deleted", "Food removed from this meal.");
+            } catch (err) {
+              handleError(err);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onAiEstimate = async () => {
     if (!customName.trim()) { Alert.alert("Enter a food name first."); return; }
     try { await aiMutation.mutateAsync(customName.trim()); }
@@ -339,19 +453,19 @@ export default function LogFoodScreen({ route, navigation }: Props) {
             <View style={s.metricsGrid}>
               <View style={s.metricBoxCompact}>
                 <Text style={s.metricLabel}>Calories</Text>
-                <Text style={s.metricValue}>{Math.round(consumed.calories)} / {Math.round(mealLimits.calories)}</Text>
+                <Text style={[s.metricValue, { color: mealSummaryColors.calories }]}>{Math.round(consumed.calories)} / {Math.round(mealLimits.calories)}</Text>
               </View>
               <View style={s.metricBoxCompact}>
                 <Text style={s.metricLabel}>Protein</Text>
-                <Text style={s.metricValue}>{Math.round(consumed.protein * 10) / 10}g / {Math.round(mealLimits.protein * 10) / 10}g</Text>
+                <Text style={[s.metricValue, { color: mealSummaryColors.protein }]}>{Math.round(consumed.protein * 10) / 10}g / {Math.round(mealLimits.protein * 10) / 10}g</Text>
               </View>
               <View style={s.metricBoxCompact}>
                 <Text style={s.metricLabel}>Carbs</Text>
-                <Text style={s.metricValue}>{Math.round(consumed.carbs * 10) / 10}g / {Math.round(mealLimits.carbs * 10) / 10}g</Text>
+                <Text style={[s.metricValue, { color: mealSummaryColors.carbs }]}>{Math.round(consumed.carbs * 10) / 10}g / {Math.round(mealLimits.carbs * 10) / 10}g</Text>
               </View>
               <View style={s.metricBoxCompact}>
                 <Text style={s.metricLabel}>Fats</Text>
-                <Text style={s.metricValue}>{Math.round(consumed.fats * 10) / 10}g / {Math.round(mealLimits.fats * 10) / 10}g</Text>
+                <Text style={[s.metricValue, { color: mealSummaryColors.fats }]}>{Math.round(consumed.fats * 10) / 10}g / {Math.round(mealLimits.fats * 10) / 10}g</Text>
               </View>
             </View>
           </View>
@@ -405,10 +519,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
               <View style={s.previewBox}>
                 <Text style={s.previewTitle}>When added ({selectedFoodPreview.grams}g)</Text>
                 <View style={s.previewRow}>
-                  <Text style={s.previewItem}>🔥 {selectedFoodPreview.calories} kcal</Text>
-                  <Text style={s.previewItem}>🥩 {selectedFoodPreview.protein}g P</Text>
-                  <Text style={s.previewItem}>🍚 {selectedFoodPreview.carbs}g C</Text>
-                  <Text style={s.previewItem}>🥑 {selectedFoodPreview.fats}g F</Text>
+                  <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {selectedFoodPreview.calories} kcal</Text>
+                  <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {selectedFoodPreview.protein}g P</Text>
+                  <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {selectedFoodPreview.carbs}g C</Text>
+                  <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {selectedFoodPreview.fats}g F</Text>
                 </View>
               </View>
             ) : null}
@@ -474,15 +588,26 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                   <View style={s.previewBox}>
                     <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
                     <View style={s.previewRow}>
-                      <Text style={s.previewItem}>🔥 {editingPreview.calories} kcal</Text>
-                      <Text style={s.previewItem}>🥩 {editingPreview.protein}g P</Text>
-                      <Text style={s.previewItem}>🍚 {editingPreview.carbs}g C</Text>
-                      <Text style={s.previewItem}>🥑 {editingPreview.fats}g F</Text>
+                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {editingPreview.calories} kcal</Text>
+                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {editingPreview.protein}g P</Text>
+                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {editingPreview.carbs}g C</Text>
+                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {editingPreview.fats}g F</Text>
                     </View>
                   </View>
                 ) : null}
 
                 <View style={s.editActions}>
+                  <Pressable
+                    onPress={onDeleteLog}
+                    disabled={deleteMutation.isPending || updateMutation.isPending}
+                    style={({ pressed }) => [
+                      s.deleteBtn,
+                      (deleteMutation.isPending || updateMutation.isPending) && s.addBtnDisabled,
+                      pressed && s.pressed,
+                    ]}
+                  >
+                    <Text style={s.deleteBtnText}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</Text>
+                  </Pressable>
                   <Pressable
                     onPress={onCancelEditLog}
                     style={({ pressed }) => [s.cancelBtn, pressed && s.pressed]}
@@ -491,7 +616,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                   </Pressable>
                   <Pressable
                     onPress={onSaveEditedLog}
-                    disabled={updateMutation.isPending}
+                    disabled={updateMutation.isPending || deleteMutation.isPending}
                     style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
                   >
                     <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
@@ -537,10 +662,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                 <View style={s.previewBox}>
                   <Text style={s.previewTitle}>Will be logged ({customFoodPreview.grams}g)</Text>
                   <View style={s.previewRow}>
-                    <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
-                    <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
-                    <Text style={s.previewItem}>🍚 {customFoodPreview.carbs}g C</Text>
-                    <Text style={s.previewItem}>🥑 {customFoodPreview.fats}g F</Text>
+                    <Text style={[s.previewItem, { color: customPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {customFoodPreview.calories} kcal</Text>
+                    <Text style={[s.previewItem, { color: customPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {customFoodPreview.protein}g P</Text>
+                    <Text style={[s.previewItem, { color: customPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {customFoodPreview.carbs}g C</Text>
+                    <Text style={[s.previewItem, { color: customPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {customFoodPreview.fats}g F</Text>
                   </View>
                 </View>
               ) : null}
@@ -751,6 +876,17 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   cancelBtnText: { fontSize: 14, fontWeight: "700", color: "#374151" },
+  deleteBtn: {
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "#fef2f2",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#b91c1c" },
 
   doneBtn: {
     backgroundColor: "#111827",

@@ -4,10 +4,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HomeScreen from "../screens/home/HomeScreen";
 import ProgressScreen from "../screens/progress/ProgressScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
+import WeightDiaryScreen from "../screens/weight/WeightDiaryScreen";
 
 export type MainTabParamList = {
   Diary: { date?: string; focusToken?: number } | undefined;
   Progress: undefined;
+  Weight: undefined;
   Settings: undefined;
 };
 
@@ -16,6 +18,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const TAB_ICONS: Record<string, string> = {
   Diary: "📖",
   Progress: "📊",
+  Weight: "⚖️",
   Settings: "⚙️",
 };
 
@@ -56,6 +59,7 @@ export default function MainTabs() {
     >
       <Tab.Screen name="Diary" component={HomeScreen} options={{ tabBarLabel: "Diary" }} />
       <Tab.Screen name="Progress" component={ProgressScreen} options={{ tabBarLabel: "Progress" }} />
+      <Tab.Screen name="Weight" component={WeightDiaryScreen} options={{ tabBarLabel: "Weight" }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: "Settings" }} />
     </Tab.Navigator>
   );
