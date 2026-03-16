@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Platform, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import HabitsScreen from "../screens/habits/HabitsScreen";
 import HomeScreen from "../screens/home/HomeScreen";
 import MetricsScreen from "../screens/metrics/MetricsScreen";
 import ProgressScreen from "../screens/progress/ProgressScreen";
@@ -9,6 +10,7 @@ import WeightDiaryScreen from "../screens/weight/WeightDiaryScreen";
 
 export type MainTabParamList = {
   Diary: { date?: string; focusToken?: number } | undefined;
+  Habits: undefined;
   Metrics: undefined;
   Progress: undefined;
   Weight: undefined;
@@ -19,6 +21,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_ICONS: Record<string, string> = {
   Diary: "📖",
+  Habits: "✅",
   Metrics: "📈",
   Progress: "📅",
   Weight: "⚖️",
@@ -61,6 +64,7 @@ export default function MainTabs() {
       })}
     >
       <Tab.Screen name="Diary" component={HomeScreen} options={{ tabBarLabel: "Diary" }} />
+      <Tab.Screen name="Habits" component={HabitsScreen} options={{ tabBarLabel: "Habits" }} />
       <Tab.Screen name="Metrics" component={MetricsScreen} options={{ tabBarLabel: "Metrics" }} />
       <Tab.Screen name="Progress" component={ProgressScreen} options={{ tabBarLabel: "Calendar" }} />
       <Tab.Screen name="Weight" component={WeightDiaryScreen} options={{ tabBarLabel: "Weight" }} />

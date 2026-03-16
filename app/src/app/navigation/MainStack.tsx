@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabs from "./MainTabs";
 import LogFoodScreen from "../screens/log-food/LogFoodScreen";
+import HabitInsightsScreen from "../screens/habits/HabitInsightsScreen";
 import type { MainStackParamList } from "./navigationTypes";
 
 export type { MainStackParamList };
@@ -11,6 +12,7 @@ export default function MainStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={MainTabs} />
+      <Stack.Screen name="HabitInsights" component={HabitInsightsScreen} />
       <Stack.Screen
         name="LogFood"
         component={LogFoodScreen}
