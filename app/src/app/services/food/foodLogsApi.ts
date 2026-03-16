@@ -37,6 +37,22 @@ export interface AiFoodEstimate {
   source?: string;
 }
 
+export interface PortionDto {
+  id: number;
+  portionName: string;
+  grams: number;
+  portionTypeId?: number;
+  portionTypeCode?: string;
+  portionTypeLabel?: string;
+}
+
+export interface PortionTypeDto {
+  id: number;
+  code: string;
+  label: string;
+  sortOrder: number;
+}
+
 interface BackendFoodItem {
   id: number;
   name: string;
@@ -189,4 +205,45 @@ export const deleteFoodLog = async (token: string, logId: number): Promise<void>
     if (response.status === 401) throw new Error("AUTH_EXPIRED");
     throw new Error(`Failed to delete food log (${response.status})`);
   }
+};
+
+export const fetchFoodPortions = async (token: string, foodId: number): Promise<PortionDto[]> => {
+  const response = await authenticatedFetch(`/food/portions?foodId=${foodId}`, token, { method: "GET" });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to fetch portions (${response.status})`);
+  }
+  return response.json();
+};
+
+export const fetchPortionTypes = async (token: string): Promise<PortionTypeDto[]> => {
+  const response = await authenticatedFetch("/food/portion-types", token, { method: "GET" });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to fetch portion types (${response.status})`);
+  }
+  return response.json();
+};
+
+export const createFoodPortion = async (
+  token: string,
+  payload: { foodId: number; portionTypeCode: string; grams: number }
+): Promise<PortionDto> => {
+  const response = await authenticatedFetch("/food/portions", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      throw new Error(parsed.error || `Failed to create portion (${response.status})`);
+    } catch {
+      throw new Error(text || `Failed to create portion (${response.status})`);
+    }
+  }
+
+  return response.json();
 };

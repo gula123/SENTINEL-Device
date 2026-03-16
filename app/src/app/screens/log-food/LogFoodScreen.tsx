@@ -19,8 +19,13 @@ import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog, useDeleteFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import {
+  createFoodPortion,
   createCustomFood,
   estimateFoodPer100gWithAi,
+  fetchFoodPortions,
+  fetchPortionTypes,
+  type PortionDto,
+  type PortionTypeDto,
   searchFoods,
   type AiFoodEstimate,
   type FoodItem,
@@ -71,8 +76,15 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
   const [query, setQuery] = useState("");
   const [grams, setGrams] = useState("100");
+  const [portionAmount, setPortionAmount] = useState("1");
+  const [selectedPortionId, setSelectedPortionId] = useState<number | null>(null);
   const [results, setResults] = useState<FoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [portions, setPortions] = useState<PortionDto[]>([]);
+  const [portionTypes, setPortionTypes] = useState<PortionTypeDto[]>([]);
+  const [showAddPortionForm, setShowAddPortionForm] = useState(false);
+  const [newPortionTypeCode, setNewPortionTypeCode] = useState("");
+  const [newPortionGrams, setNewPortionGrams] = useState("100");
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -120,19 +132,33 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     return perDay[dayName]?.meals[key] || { calories: 0, protein: 0, carbs: 0, fats: 0 };
   }, [settingsQuery.data, date, meal]);
 
+  const selectedPortion = useMemo(
+    () => portions.find((portion) => portion.id === selectedPortionId) || null,
+    [portions, selectedPortionId]
+  );
+
+  const resolvedGrams = useMemo(() => {
+    if (selectedPortion) {
+      const parsedAmount = Number(portionAmount);
+      const amount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 0;
+      return Math.round(selectedPortion.grams * amount * 10) / 10;
+    }
+
+    const parsedGrams = Number(grams);
+    return Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
+  }, [selectedPortion, portionAmount, grams]);
+
   const selectedFoodPreview = useMemo(() => {
     if (!selectedFood) return null;
-    const parsedGrams = Number(grams);
-    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
-    const factor = g / 100;
+    const factor = resolvedGrams / 100;
     return {
-      grams: g,
+      grams: resolvedGrams,
       calories: Math.round(selectedFood.calories * factor),
       protein: Math.round(selectedFood.protein * factor * 10) / 10,
       carbs: Math.round(selectedFood.carbs * factor * 10) / 10,
       fats: Math.round(selectedFood.fats * factor * 10) / 10,
     };
-  }, [selectedFood, grams]);
+  }, [selectedFood, resolvedGrams]);
 
   const mealSummaryColors = useMemo(() => {
     return {
@@ -304,6 +330,30 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   }
 
   useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    const loadPortionTypes = async () => {
+      try {
+        const types = await fetchPortionTypes(token);
+        if (!cancelled) {
+          setPortionTypes(types);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          handleError(err);
+        }
+      }
+    };
+
+    loadPortionTypes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
     }, 350);
@@ -354,6 +404,12 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const onSearch = (text: string) => {
     setQuery(text);
     setSelectedFood(null);
+    setSelectedPortionId(null);
+    setPortionAmount("1");
+    setPortions([]);
+    setShowAddPortionForm(false);
+    setNewPortionTypeCode("");
+    setNewPortionGrams("100");
     if (text.trim().length < 2) {
       setResults([]);
       setSearching(false);
@@ -361,16 +417,38 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   };
 
   const onAdd = async () => {
-    const g = Number(grams);
+    const g = resolvedGrams;
     if (!selectedFood) { Alert.alert("Select a food", "Search and tap a result first."); return; }
     if (!Number.isFinite(g) || g <= 0) { Alert.alert("Invalid grams", "Enter a positive number."); return; }
     try {
       await addMutation.mutateAsync({ foodName: selectedFood.name, foodId: selectedFood.id, grams: g, mealType: meal });
       invalidate();
-      setQuery(""); setResults([]); setSelectedFood(null); setGrams("100");
+      setQuery(""); setResults([]); setSelectedFood(null); setSelectedPortionId(null); setPortionAmount("1"); setGrams("100");
     } catch (err) {
       handleError(err);
     }
+  };
+
+  const onChangeGrams = (value: string) => {
+    setGrams(value);
+  };
+
+  const onChangePortionAmount = (value: string) => {
+    setPortionAmount(value);
+  };
+
+  const onSelectPortion = (portion: PortionDto) => {
+    setSelectedPortionId(portion.id);
+    setPortionAmount("1");
+    setGrams(String(Math.round(portion.grams * 10) / 10));
+  };
+
+  const onSelectGramMode = () => {
+    if (selectedPortion) {
+      setGrams(String(resolvedGrams));
+    }
+    setSelectedPortionId(null);
+    setPortionAmount("1");
   };
 
   const onStartEditLog = (logId: number, currentGrams: number) => {
@@ -433,6 +511,54 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     catch (err) { handleError(err); }
   };
 
+  const availablePortionTypes = useMemo(() => {
+    return portionTypes.filter((type) =>
+      !portions.some((portion) => (portion.portionTypeCode || "").toLowerCase() === type.code.toLowerCase())
+    );
+  }, [portionTypes, portions]);
+
+  const loadPortionsForFood = async (foodId: number) => {
+    if (!token) return;
+    const data = await fetchFoodPortions(token, foodId);
+    setPortions(data);
+  };
+
+  const onCreatePortionForFood = async () => {
+    if (!token || !selectedFood) {
+      Alert.alert("Select a food first");
+      return;
+    }
+
+    if (!newPortionTypeCode) {
+      Alert.alert("Choose portion type", "Please select a portion type.");
+      return;
+    }
+
+    const gramsValue = Number(newPortionGrams);
+    if (!Number.isFinite(gramsValue) || gramsValue <= 0) {
+      Alert.alert("Invalid grams", "Enter a positive number.");
+      return;
+    }
+
+    try {
+      const created = await createFoodPortion(token, {
+        foodId: selectedFood.id,
+        portionTypeCode: newPortionTypeCode,
+        grams: gramsValue,
+      });
+
+      await loadPortionsForFood(selectedFood.id);
+        setSelectedPortionId(created.id);
+        setPortionAmount("1");
+      setGrams(String(Math.round(created.grams * 10) / 10));
+      setShowAddPortionForm(false);
+      setNewPortionTypeCode("");
+      setNewPortionGrams("100");
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -485,7 +611,17 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                   ) : null}
                 </View>
                 <Pressable
-                  onPress={() => { setSelectedFood(null); setQuery(""); setResults([]); }}
+                  onPress={() => {
+                    setSelectedFood(null);
+                    setQuery("");
+                    setResults([]);
+                    setSelectedPortionId(null);
+                    setPortionAmount("1");
+                    setPortions([]);
+                    setShowAddPortionForm(false);
+                    setNewPortionTypeCode("");
+                    setNewPortionGrams("100");
+                  }}
                   style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}
                   accessibilityLabel="Clear selected food"
                 >
@@ -511,7 +647,21 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                     {results.map((item) => (
                       <Pressable
                         key={item.id}
-                        onPress={() => { setSelectedFood(item); setQuery(item.name); setResults([]); }}
+                        onPress={async () => {
+                          setSelectedFood(item);
+                          setQuery(item.name);
+                          setResults([]);
+                          setSelectedPortionId(null);
+                          setPortionAmount("1");
+                          setShowAddPortionForm(false);
+                          setNewPortionTypeCode("");
+                          setNewPortionGrams("100");
+                          try {
+                            await loadPortionsForFood(item.id);
+                          } catch (err) {
+                            handleError(err);
+                          }
+                        }}
                         style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
                       >
                         <View style={s.resultTextCol}>
@@ -528,7 +678,11 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
             {selectedFoodPreview ? (
               <View style={s.previewBox}>
-                <Text style={s.previewTitle}>When added ({selectedFoodPreview.grams}g)</Text>
+                <Text style={s.previewTitle}>
+                  {selectedPortion
+                    ? `When added (${portionAmount || "0"} x ${selectedPortion.portionName} = ${selectedFoodPreview.grams}g)`
+                    : `When added (${selectedFoodPreview.grams}g)`}
+                </Text>
                 <View style={s.previewRow}>
                   <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {selectedFoodPreview.calories} kcal</Text>
                   <Text style={[s.previewItem, { color: selectedPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {selectedFoodPreview.protein}g P</Text>
@@ -540,10 +694,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
             <View style={s.row}>
               <TextInput
-                value={grams}
-                onChangeText={setGrams}
+                value={selectedPortion ? portionAmount : grams}
+                onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
                 keyboardType="numeric"
-                placeholder="Grams"
+                placeholder={selectedPortion ? "Amount" : "Grams"}
                 placeholderTextColor="#9ca3af"
                 style={[s.input, s.gramsInput]}
                 returnKeyType="done"
@@ -556,6 +710,100 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                 <Text style={s.addBtnText}>{addMutation.isPending ? "Adding…" : "Add"}</Text>
               </Pressable>
             </View>
+
+            {selectedPortion ? (
+              <Text style={s.portionAmountHint}>
+                Qty x {selectedPortion.portionName} = {Math.round(selectedFoodPreview?.grams ?? 0)}g
+              </Text>
+            ) : null}
+
+            {selectedFood && portions.length > 0 ? (
+              <View style={s.portionWrap}>
+                <Text style={s.portionLabel}>Portions for this food</Text>
+                <View style={s.portionRow}>
+                  <Pressable
+                    onPress={onSelectGramMode}
+                    style={({ pressed }) => [
+                      s.portionChip,
+                      selectedPortionId === null && s.portionChipActive,
+                      pressed && s.pressed,
+                    ]}
+                  >
+                    <Text style={[
+                      s.portionChipText,
+                      selectedPortionId === null && s.portionChipTextActive,
+                    ]}>Grams</Text>
+                  </Pressable>
+                  {portions.map((portion) => (
+                    <Pressable
+                      key={portion.id}
+                      onPress={() => onSelectPortion(portion)}
+                      style={({ pressed }) => [
+                        s.portionChip,
+                        selectedPortionId === portion.id && s.portionChipActive,
+                        pressed && s.pressed,
+                      ]}
+                    >
+                      <Text style={[
+                        s.portionChipText,
+                        selectedPortionId === portion.id && s.portionChipTextActive,
+                      ]}>{portion.portionName} ({Math.round(portion.grams)}g)</Text>
+                    </Pressable>
+                  ))}
+                  <Pressable
+                    onPress={() => setShowAddPortionForm((v) => !v)}
+                    style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
+                  >
+                    <Text style={s.portionChipAddText}>+ Add another portion</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : selectedFood ? (
+              <View style={s.portionWrap}>
+                <Text style={s.portionLabel}>No saved portions yet</Text>
+                <Pressable
+                  onPress={() => setShowAddPortionForm((v) => !v)}
+                  style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
+                >
+                  <Text style={s.portionChipAddText}>+ Add first portion</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {selectedFood && showAddPortionForm ? (
+              <View style={s.addPortionBox}>
+                <Text style={s.addPortionTitle}>Add portion for {selectedFood.name}</Text>
+                <View style={s.portionRow}>
+                  {availablePortionTypes.map((type) => (
+                    <Pressable
+                      key={type.id}
+                      onPress={() => setNewPortionTypeCode(type.code)}
+                      style={({ pressed }) => [
+                        s.typeChip,
+                        newPortionTypeCode === type.code && s.typeChipActive,
+                        pressed && s.pressed,
+                      ]}
+                    >
+                      <Text style={[s.typeChipText, newPortionTypeCode === type.code && s.typeChipTextActive]}>{type.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={s.row}>
+                  <TextInput
+                    value={newPortionGrams}
+                    onChangeText={setNewPortionGrams}
+                    keyboardType="numeric"
+                    placeholder="Grams"
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.gramsInput]}
+                  />
+                  <Pressable onPress={onCreatePortionForFood} style={({ pressed }) => [s.addBtn, pressed && s.pressed]}>
+                    <Text style={s.addBtnText}>Save portion</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           <View style={s.card}>
@@ -843,6 +1091,62 @@ const s = StyleSheet.create({
 
   row: { flexDirection: "row", gap: 10, alignItems: "center" },
   gramsInput: { flex: 1 },
+  portionAmountHint: { fontSize: 11, color: "#6b7280", marginTop: -2 },
+  portionWrap: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    backgroundColor: "#f9fafb",
+  },
+  portionLabel: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+  portionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  portionChip: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  portionChipActive: {
+    borderColor: "#16a34a",
+    backgroundColor: "#dcfce7",
+  },
+  portionChipText: { fontSize: 11, color: "#374151", fontWeight: "600" },
+  portionChipTextActive: { fontSize: 11, color: "#166534", fontWeight: "600" },
+  portionChipAdd: {
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  portionChipAddText: { fontSize: 11, color: "#166534", fontWeight: "700" },
+  addPortionBox: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    backgroundColor: "#f0fdf4",
+  },
+  addPortionTitle: { fontSize: 12, color: "#166534", fontWeight: "700" },
+  typeChip: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  typeChipActive: { borderColor: "#16a34a", backgroundColor: "#dcfce7" },
+  typeChipText: { fontSize: 11, color: "#374151", fontWeight: "600" },
+  typeChipTextActive: { color: "#166534" },
 
   addBtn: {
     backgroundColor: "#16a34a",
