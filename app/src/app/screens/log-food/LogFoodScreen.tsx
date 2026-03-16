@@ -78,6 +78,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
   const [showCustom, setShowCustom] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [customBrandOrPlace, setCustomBrandOrPlace] = useState("");
   const [customCalories, setCustomCalories] = useState("0");
   const [customProtein, setCustomProtein] = useState("0");
   const [customCarbs, setCustomCarbs] = useState("0");
@@ -246,7 +247,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const aiMutation = useMutation({
     mutationFn: async (name: string): Promise<AiFoodEstimate> => {
       if (!token) throw new Error("AUTH_REQUIRED");
-      return estimateFoodPer100gWithAi(token, name);
+      return estimateFoodPer100gWithAi(token, name, customBrandOrPlace.trim() || undefined);
     },
     onSuccess: (e) => {
       setCustomCalories(String(Math.round(e.caloriesPer100g)));
@@ -266,6 +267,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
       const created = await createCustomFood(token, {
         name: customName.trim(),
+        brandOrPlace: customBrandOrPlace.trim() || undefined,
         caloriesPer100g: Number(customCalories) || 0,
         proteinPer100g: Number(customProtein) || 0,
         carbsPer100g: Number(customCarbs) || 0,
@@ -282,6 +284,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     onSuccess: () => {
       setCustomName(""); setCustomCalories("0"); setCustomProtein("0");
       setCustomCarbs("0"); setCustomFats("0"); setCustomGrams("100");
+      setCustomBrandOrPlace("");
       setAiNote(""); setShowCustom(false);
       invalidate();
       Alert.alert("Done", "Custom food logged.");
@@ -475,7 +478,12 @@ export default function LogFoodScreen({ route, navigation }: Props) {
             <Text style={s.cardTitle}>Search Food</Text>
             {selectedFood ? (
               <View style={s.selectedChip}>
-                <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
+                  {selectedFood.brandOrPlace ? (
+                    <Text style={s.selectedChipSubText} numberOfLines={1}>{selectedFood.brandOrPlace}</Text>
+                  ) : null}
+                </View>
                 <Pressable
                   onPress={() => { setSelectedFood(null); setQuery(""); setResults([]); }}
                   style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}
@@ -506,7 +514,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                         onPress={() => { setSelectedFood(item); setQuery(item.name); setResults([]); }}
                         style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
                       >
-                        <Text style={s.resultName}>{item.name}</Text>
+                        <View style={s.resultTextCol}>
+                          <Text style={s.resultName}>{item.name}</Text>
+                          {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                        </View>
                         <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
                       </Pressable>
                     ))}
@@ -560,7 +571,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                     onPress={() => onStartEditLog(item.id, item.grams)}
                     style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
                   >
-                    <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
+                    <View style={s.resultTextCol}>
+                      <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
+                      {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                    </View>
                     <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
                   </Pressable>
                 ))}
@@ -641,6 +655,9 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
               <Text style={s.fieldHelp}>Food name: what you want this food saved as.</Text>
               <TextInput value={customName} onChangeText={setCustomName} placeholder="Food name" placeholderTextColor="#9ca3af" style={s.input} />
+
+              <Text style={s.fieldHelp}>Brand or place (optional): manufacturer or restaurant.</Text>
+              <TextInput value={customBrandOrPlace} onChangeText={setCustomBrandOrPlace} placeholder="e.g. Heineken / Burger King" placeholderTextColor="#9ca3af" style={s.input} />
 
               <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
                 <Text style={s.aiBtnText}>{aiMutation.isPending ? "Estimating…" : "✨ AI Estimate"}</Text>
@@ -796,7 +813,9 @@ const s = StyleSheet.create({
     borderBottomColor: "#f3f4f6",
     backgroundColor: "#fff",
   },
-  resultName: { flex: 1, fontSize: 13, color: "#111827", marginRight: 8 },
+  resultTextCol: { flex: 1, marginRight: 8 },
+  resultName: { fontSize: 13, color: "#111827" },
+  resultSubmeta: { fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: "500" },
   resultMeta: { fontSize: 12, color: "#9ca3af" },
 
   selectedChip: {
@@ -811,6 +830,7 @@ const s = StyleSheet.create({
     gap: 8,
   },
   selectedChipText: { flex: 1, fontSize: 13, color: "#166534", fontWeight: "600" },
+  selectedChipSubText: { fontSize: 11, color: "#6b7280", fontWeight: "500", marginTop: 2 },
   clearBtn: {
     width: 26,
     height: 26,

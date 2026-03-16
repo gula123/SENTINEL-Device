@@ -5,6 +5,7 @@ export type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACKS";
 export interface FoodLogDto {
   id: number;
   foodName: string;
+  brandOrPlace?: string;
   foodId?: number;
   calories: number;
   protein: number;
@@ -18,6 +19,7 @@ export interface FoodLogDto {
 export interface FoodItem {
   id: number;
   name: string;
+  brandOrPlace?: string;
   calories: number;
   protein: number;
   carbs: number;
@@ -38,6 +40,7 @@ export interface AiFoodEstimate {
 interface BackendFoodItem {
   id: number;
   name: string;
+  brandOrPlace?: string | null;
   caloriesPer100g: number;
   proteinPer100g: number;
   carbsPer100g: number;
@@ -71,6 +74,7 @@ export const searchFoods = async (token: string, query: string): Promise<FoodIte
   return items.map((item) => ({
     id: item.id,
     name: item.name,
+    brandOrPlace: item.brandOrPlace || undefined,
     calories: item.caloriesPer100g,
     protein: item.proteinPer100g,
     carbs: item.carbsPer100g,
@@ -83,6 +87,7 @@ export const createCustomFood = async (
   token: string,
   payload: {
     name: string;
+    brandOrPlace?: string;
     caloriesPer100g: number;
     proteinPer100g: number;
     carbsPer100g: number;
@@ -103,6 +108,7 @@ export const createCustomFood = async (
   return {
     id: item.id,
     name: item.name,
+    brandOrPlace: item.brandOrPlace || undefined,
     calories: item.caloriesPer100g,
     protein: item.proteinPer100g,
     carbs: item.carbsPer100g,
@@ -111,10 +117,10 @@ export const createCustomFood = async (
   };
 };
 
-export const estimateFoodPer100gWithAi = async (token: string, foodName: string): Promise<AiFoodEstimate> => {
+export const estimateFoodPer100gWithAi = async (token: string, foodName: string, brandOrPlace?: string): Promise<AiFoodEstimate> => {
   const response = await authenticatedFetch("/food/ai-estimate", token, {
     method: "POST",
-    body: JSON.stringify({ foodName }),
+    body: JSON.stringify({ foodName, brandOrPlace }),
   });
 
   if (!response.ok) {
