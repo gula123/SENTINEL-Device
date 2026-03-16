@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -358,6 +358,55 @@ export default function HabitInsightsScreen() {
     return map;
   }, [calendarQuery.data]);
 
+  // Debounce handler for day taps - optimistic UI updates immediately, backend call debounced
+  const debouncedLogRef = useRef<{ date: string; currentValue?: boolean } | null>(null);
+  const debouncedLogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDayTap = useCallback(
+    (date: string, currentValue?: boolean) => {
+      // Cancel previous debounced call
+      if (debouncedLogTimeoutRef.current) {
+        clearTimeout(debouncedLogTimeoutRef.current);
+      }
+
+      // Store the latest tap
+      debouncedLogRef.current = { date, currentValue };
+
+      // Debounce the actual mutation call (300ms delay)
+      debouncedLogTimeoutRef.current = setTimeout(() => {
+        if (debouncedLogRef.current) {
+          logMutation.mutate(debouncedLogRef.current, {
+            onError: (error) => {
+              void handleError(error, "Failed to update habit day");
+            },
+          });
+          debouncedLogRef.current = null;
+        }
+      }, 300);
+
+      // Optimistic UI update - immediately cycle through states for smooth feel
+      const queryKey = ["habitCalendar", habitId, currentMonth.format("YYYY-MM")];
+      const previousLogs = queryClient.getQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey);
+
+      queryClient.setQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey, (current) => {
+        const existing = current || [];
+
+        if (currentValue === undefined) {
+          return [...existing, { logDate: date, completed: true }];
+        }
+
+        if (currentValue === true) {
+          return existing.map((log) =>
+            log.logDate === date ? { ...log, completed: false } : log
+          );
+        }
+
+        return existing.filter((log) => log.logDate !== date);
+      });
+    },
+    [habitId, currentMonth, queryClient, logMutation, handleError]
+  );
+
   const scoreChart = useMemo(() => {
     const points = insightsQuery.data?.historicalScores || [];
     return {
@@ -375,7 +424,8 @@ export default function HabitInsightsScreen() {
   }, [insightsQuery.data?.monthlyStats]);
 
   const monthDays = currentMonth.daysInMonth();
-  const monthOffset = currentMonth.startOf("month").day();
+  // Adjust offset for Monday start: dayjs returns 0=Sun, so we need (day + 6) % 7 for Mon=0
+  const monthOffset = (currentMonth.startOf("month").day() + 6) % 7;
   const monthCells = useMemo(() => {
     const leading = Array.from({ length: monthOffset }, (_, index) => ({ key: `lead-${index}`, day: 0 }));
     const days = Array.from({ length: monthDays }, (_, index) => ({ key: `day-${index + 1}`, day: index + 1 }));
@@ -540,7 +590,7 @@ export default function HabitInsightsScreen() {
               </View>
 
               <View style={styles.weekHeader}>
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
                   <Text key={label} style={styles.weekHeaderText}>{label}</Text>
                 ))}
               </View>
@@ -566,16 +616,7 @@ export default function HabitInsightsScreen() {
                     return (
                       <Pressable
                         key={cell.key}
-                        onPress={() => {
-                          logMutation.mutate(
-                            { date, currentValue: value },
-                            {
-                              onError: (error) => {
-                                void handleError(error, "Failed to update habit day");
-                              },
-                            }
-                          );
-                        }}
+                        onPress={() => handleDayTap(date, value)}
                         style={({ pressed }) => [
                           styles.dayCell,
                           { backgroundColor, borderColor: isToday ? "#0f172a" : backgroundColor },
