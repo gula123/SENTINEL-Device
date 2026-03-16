@@ -6,10 +6,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -17,13 +19,135 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BarChart, LineChart } from "react-native-chart-kit";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import {
+  deleteHabitLog,
+  deleteGoal,
+  deleteHabit,
+  fetchHabits,
   getHabitHistoricalScores,
   getHabitLogs,
   getHabitMetrics,
   getHabitMonthlyStats,
   logHabit,
+  setGoal,
+  updateHabit,
+  type Goal,
 } from "../../services/habits/habitApi";
 import { useAuth } from "../../state/AuthContext";
+
+type FormState = {
+  habitName: string;
+  description: string;
+  goalEnabled: boolean;
+  goalType: Extract<Goal["goalType"], "DAYS_PER_WEEK" | "DAYS_PER_MONTH">;
+  targetDays: string;
+};
+
+const createFormState = (habit?: { habitName: string; description?: string; goal?: Goal }): FormState => ({
+  habitName: habit?.habitName ?? "",
+  description: habit?.description ?? "",
+  goalEnabled: Boolean(habit?.goal),
+  goalType: habit?.goal?.goalType === "DAYS_PER_MONTH" ? "DAYS_PER_MONTH" : "DAYS_PER_WEEK",
+  targetDays: habit?.goal?.targetDays ? String(habit.goal.targetDays) : "4",
+});
+
+function HabitManageModal({
+  visible,
+  formState,
+  setFormState,
+  isSaving,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  formState: FormState;
+  setFormState: (next: FormState) => void;
+  isSaving: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Edit Habit</Text>
+          <Text style={styles.modalSubtitle}>Update the habit name and regularity from here.</Text>
+
+          <Text style={styles.fieldLabel}>Habit Name</Text>
+          <TextInput
+            value={formState.habitName}
+            onChangeText={(habitName) => setFormState({ ...formState, habitName })}
+            placeholder="Habit name"
+            placeholderTextColor="#9ca3af"
+            style={styles.input}
+          />
+
+          <Text style={styles.fieldLabel}>Description</Text>
+          <TextInput
+            value={formState.description}
+            onChangeText={(description) => setFormState({ ...formState, description })}
+            placeholder="Optional detail"
+            placeholderTextColor="#9ca3af"
+            multiline
+            style={[styles.input, styles.textArea]}
+          />
+
+          <Pressable
+            onPress={() => setFormState({ ...formState, goalEnabled: !formState.goalEnabled })}
+            style={({ pressed }) => [styles.goalToggle, formState.goalEnabled && styles.goalToggleActive, pressed && styles.pressed]}
+          >
+            <Text style={[styles.goalToggleText, formState.goalEnabled && styles.goalToggleTextActive]}>
+              {formState.goalEnabled ? "Goal enabled" : "Add a goal"}
+            </Text>
+          </Pressable>
+
+          {formState.goalEnabled ? (
+            <>
+              <View style={styles.goalTypeRow}>
+                {[
+                  { label: "Per week", value: "DAYS_PER_WEEK" as const },
+                  { label: "Per month", value: "DAYS_PER_MONTH" as const },
+                ].map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setFormState({ ...formState, goalType: option.value })}
+                    style={({ pressed }) => [
+                      styles.goalTypeChip,
+                      formState.goalType === option.value && styles.goalTypeChipActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.goalTypeText, formState.goalType === option.value && styles.goalTypeTextActive]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Target Days</Text>
+              <TextInput
+                value={formState.targetDays}
+                onChangeText={(targetDays) => setFormState({ ...formState, targetDays })}
+                keyboardType="numeric"
+                placeholder="4"
+                placeholderTextColor="#9ca3af"
+                style={styles.input}
+              />
+            </>
+          ) : null}
+
+          <View style={styles.modalActions}>
+            <Pressable onPress={onClose} style={({ pressed }) => [styles.modalSecondaryBtn, pressed && styles.pressed]}>
+              <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable onPress={onSubmit} style={({ pressed }) => [styles.modalPrimaryBtn, (pressed || isSaving) && styles.pressed]}>
+              {isSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPrimaryBtnText}>Save</Text>}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 const chartConfig = {
   backgroundColor: "#ffffff",
@@ -63,6 +187,22 @@ export default function HabitInsightsScreen() {
   const { habitId, habitName } = route.params;
   const { width } = useWindowDimensions();
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [formState, setFormState] = useState<FormState>(createFormState({ habitName }));
+
+  const habitsQuery = useQuery({
+    queryKey: ["habits"],
+    queryFn: async () => {
+      if (!token) throw new Error("AUTH_REQUIRED");
+      return fetchHabits(token);
+    },
+    enabled: Boolean(token),
+  });
+
+  const habitRecord = useMemo(
+    () => habitsQuery.data?.find((habit) => habit.id === habitId),
+    [habitId, habitsQuery.data]
+  );
 
   const insightsQuery = useQuery({
     queryKey: ["habitInsights", habitId],
@@ -102,16 +242,94 @@ export default function HabitInsightsScreen() {
   const logMutation = useMutation({
     mutationFn: async ({ date, currentValue }: { date: string; currentValue?: boolean }) => {
       if (!token) throw new Error("AUTH_REQUIRED");
-      const nextValue = currentValue === true ? false : true;
-      return logHabit(token, habitId, date, nextValue);
+      if (currentValue === undefined) {
+        return logHabit(token, habitId, date, true);
+      }
+      if (currentValue === true) {
+        return logHabit(token, habitId, date, false);
+      }
+      return deleteHabitLog(token, habitId, date);
+    },
+    onMutate: async ({ date, currentValue }) => {
+      const queryKey = ["habitCalendar", habitId, currentMonth.format("YYYY-MM")];
+      await queryClient.cancelQueries({ queryKey });
+      const previousLogs = queryClient.getQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey);
+
+      queryClient.setQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey, (current) => {
+        const existing = current || [];
+
+        if (currentValue === undefined) {
+          return [...existing, { logDate: date, completed: true }];
+        }
+
+        if (currentValue === true) {
+          return existing.map((log) =>
+            log.logDate === date ? { ...log, completed: false } : log
+          );
+        }
+
+        return existing.filter((log) => log.logDate !== date);
+      });
+
+      return { previousLogs };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousLogs) {
+        queryClient.setQueryData(["habitCalendar", habitId, currentMonth.format("YYYY-MM")], context.previousLogs);
+      }
+
+      void handleError(error, "Failed to update habit day");
+    },
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: ["habitInsights", habitId] });
+      void queryClient.invalidateQueries({ queryKey: ["habits"] });
+      void queryClient.invalidateQueries({ queryKey: ["habitWidgets"] });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error("AUTH_REQUIRED");
+      const nextName = formState.habitName.trim();
+      if (!nextName) throw new Error("Habit name is required");
+
+      const updated = await updateHabit(token, habitId, nextName, formState.description.trim());
+
+      if (formState.goalEnabled) {
+        const targetDays = Number(formState.targetDays);
+        if (!Number.isFinite(targetDays) || targetDays <= 0) {
+          throw new Error("Goal target days must be greater than 0");
+        }
+        updated.goal = await setGoal(token, habitId, formState.goalType, targetDays);
+      } else if (habitRecord?.goal) {
+        await deleteGoal(token, habitId);
+        delete updated.goal;
+      }
+
+      return updated;
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["habitInsights", habitId] }),
-        queryClient.invalidateQueries({ queryKey: ["habitCalendar", habitId] }),
         queryClient.invalidateQueries({ queryKey: ["habits"] }),
+        queryClient.invalidateQueries({ queryKey: ["habitInsights", habitId] }),
         queryClient.invalidateQueries({ queryKey: ["habitWidgets"] }),
       ]);
+      setIsManageModalOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error("AUTH_REQUIRED");
+      await deleteHabit(token, habitId);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["habits"] }),
+        queryClient.invalidateQueries({ queryKey: ["habitInsights"] }),
+        queryClient.invalidateQueries({ queryKey: ["habitWidgets"] }),
+      ]);
+      navigation.goBack();
     },
   });
 
@@ -129,6 +347,8 @@ export default function HabitInsightsScreen() {
   };
 
   const chartWidth = Math.max(280, width - 72);
+
+  const pageTitle = habitRecord?.habitName ?? habitName;
 
   const logsMap = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -178,9 +398,42 @@ export default function HabitInsightsScreen() {
             <Text style={styles.backBtnText}>‹</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pageTitle}>{habitName}</Text>
-              <Text style={styles.pageSubtitle}>Score history, monthly completions, and the month view for habit logging.</Text>
+            <Text style={styles.pageTitle}>{pageTitle}</Text>
+            <Text style={styles.pageSubtitle}>Score history, monthly completions, and the month view for habit logging.</Text>
           </View>
+        </View>
+
+        <View style={styles.manageRow}>
+          <Pressable
+            onPress={() => {
+              setFormState(createFormState(habitRecord ?? { habitName: pageTitle }));
+              setIsManageModalOpen(true);
+            }}
+            style={({ pressed }) => [styles.manageBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.manageBtnText}>Edit habit</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              Alert.alert("Delete habit?", `Remove \"${pageTitle}\"?`, [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => {
+                    deleteMutation.mutate(undefined, {
+                      onError: (error) => {
+                        void handleError(error, "Delete failed");
+                      },
+                    });
+                  },
+                },
+              ]);
+            }}
+            style={({ pressed }) => [styles.manageBtn, styles.manageDeleteBtn, pressed && styles.pressed]}
+          >
+            <Text style={[styles.manageBtnText, styles.manageDeleteBtnText]}>Delete habit</Text>
+          </Pressable>
         </View>
 
         {insightsQuery.isLoading ? (
@@ -342,6 +595,21 @@ export default function HabitInsightsScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <HabitManageModal
+        visible={isManageModalOpen}
+        formState={formState}
+        setFormState={setFormState}
+        isSaving={saveMutation.isPending}
+        onClose={() => setIsManageModalOpen(false)}
+        onSubmit={() => {
+          saveMutation.mutate(undefined, {
+            onError: (error) => {
+              void handleError(error, "Save failed");
+            },
+          });
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -365,6 +633,18 @@ const styles = StyleSheet.create({
   backBtnText: { fontSize: 24, color: "#16a34a", fontWeight: "800", lineHeight: 26 },
   pageTitle: { fontSize: 24, fontWeight: "800", color: "#111827" },
   pageSubtitle: { fontSize: 13, color: "#6b7280" },
+  manageRow: { flexDirection: "row", gap: 8 },
+  manageBtn: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#d1fae5",
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  manageBtnText: { color: "#166534", fontWeight: "700", fontSize: 12 },
+  manageDeleteBtn: { borderColor: "#fecaca", backgroundColor: "#fff7f7" },
+  manageDeleteBtnText: { color: "#b91c1c" },
 
   centerBox: { backgroundColor: "#f0fdf4", borderRadius: 16, padding: 24, alignItems: "center", gap: 10 },
   loadingText: { fontSize: 14, color: "#4b5563" },
@@ -439,4 +719,71 @@ const styles = StyleSheet.create({
   todayRing: { borderWidth: 2 },
   dayCellText: { fontWeight: "800" },
   calendarHint: { fontSize: 12, color: "#6b7280" },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17, 24, 39, 0.35)",
+    justifyContent: "flex-end",
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    gap: 12,
+  },
+  modalTitle: { fontSize: 22, fontWeight: "800", color: "#111827" },
+  modalSubtitle: { fontSize: 13, color: "#6b7280" },
+  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#374151" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#d1fae5",
+    borderRadius: 12,
+    backgroundColor: "#f8fdfb",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#111827",
+  },
+  textArea: { minHeight: 90, textAlignVertical: "top" },
+  goalToggle: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  goalToggleActive: { borderColor: "#86efac", backgroundColor: "#f0fdf4" },
+  goalToggleText: { color: "#374151", fontWeight: "700" },
+  goalToggleTextActive: { color: "#166534" },
+  goalTypeRow: { flexDirection: "row", gap: 10 },
+  goalTypeChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  goalTypeChipActive: { borderColor: "#86efac", backgroundColor: "#f0fdf4" },
+  goalTypeText: { color: "#374151", fontWeight: "700" },
+  goalTypeTextActive: { color: "#166534" },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  modalSecondaryBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  modalSecondaryBtnText: { color: "#374151", fontWeight: "700" },
+  modalPrimaryBtn: {
+    flex: 1,
+    backgroundColor: "#16a34a",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  modalPrimaryBtnText: { color: "#fff", fontWeight: "700" },
 });

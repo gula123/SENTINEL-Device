@@ -19,15 +19,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import {
   createHabit,
-  deleteGoal,
-  deleteHabit,
+  deleteHabitLog,
   fetchHabits,
   getHabitLogsBatch,
   getHabitMetricsBatch,
+  logHabit,
   setGoal,
-  updateHabit,
   type Goal,
-  type Habit,
   type HabitMetrics,
 } from "../../services/habits/habitApi";
 import { useAuth } from "../../state/AuthContext";
@@ -52,19 +50,21 @@ const EMPTY_WIDGET_DATA: WidgetData = {
   lastFourDaysByHabitId: {},
 };
 
-const createFormState = (habit?: Habit): FormState => ({
-  habitName: habit?.habitName ?? "",
-  description: habit?.description ?? "",
-  goalEnabled: Boolean(habit?.goal),
-  goalType: habit?.goal?.goalType === "DAYS_PER_MONTH" ? "DAYS_PER_MONTH" : "DAYS_PER_WEEK",
-  targetDays: habit?.goal?.targetDays ? String(habit.goal.targetDays) : "4",
+const createFormState = (): FormState => ({
+  habitName: "",
+  description: "",
+  goalEnabled: false,
+  goalType: "DAYS_PER_WEEK",
+  targetDays: "4",
 });
 
-const formatGoalLabel = (goal?: Goal): string | null => {
-  if (!goal) return null;
-  if (goal.goalType === "DAILY") return "Every day";
-  return `${goal.targetDays} days per ${goal.goalType === "DAYS_PER_WEEK" ? "week" : "month"}`;
+const getNextDayStatus = (status: DayStatus): DayStatus => {
+  if (status === "unknown") return "success";
+  if (status === "success") return "no-success";
+  return "unknown";
 };
+
+const toCompletedValue = (status: DayStatus): boolean => status === "success";
 
 const metricTone = (value: number) => {
   if (value >= 85) return { bg: "#dcfce7", text: "#166534", border: "#86efac" };
@@ -77,13 +77,13 @@ function MetricPill({ label, value }: { label: string; value: number }) {
 
   return (
     <View style={[styles.metricPill, { backgroundColor: tone.bg, borderColor: tone.border }]}>
-      <Text style={[styles.metricValue, { color: tone.text }]}>{value.toFixed(0)}%</Text>
+      <Text style={[styles.metricValue, { color: tone.text }]}>{value.toFixed(0)}</Text>
       <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
 
-function DayStatusBadge({ date, status }: { date: string; status: DayStatus }) {
+function DayStatusBadge({ date, status, onPress }: { date: string; status: DayStatus; onPress: () => void }) {
   const meta =
     status === "success"
       ? { bg: "#dcfce7", text: "#166534", glyph: "✓" }
@@ -92,18 +92,23 @@ function DayStatusBadge({ date, status }: { date: string; status: DayStatus }) {
         : { bg: "#f3f4f6", text: "#9ca3af", glyph: "•" };
 
   return (
-    <View style={styles.dayStatusWrap}>
+    <Pressable
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      style={({ pressed }) => [styles.dayStatusWrap, pressed && styles.pressed]}
+    >
       <Text style={styles.dayStatusLabel}>{dayjs(date).format("dd")}</Text>
       <View style={[styles.dayStatusDot, { backgroundColor: meta.bg }]}>
         <Text style={[styles.dayStatusGlyph, { color: meta.text }]}>{meta.glyph}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 function HabitFormModal({
   visible,
-  editingHabit,
   formState,
   setFormState,
   isSaving,
@@ -111,7 +116,6 @@ function HabitFormModal({
   onSubmit,
 }: {
   visible: boolean;
-  editingHabit?: Habit;
   formState: FormState;
   setFormState: (next: FormState) => void;
   isSaving: boolean;
@@ -122,7 +126,7 @@ function HabitFormModal({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>{editingHabit ? "Edit Habit" : "New Habit"}</Text>
+          <Text style={styles.modalTitle}>New Habit</Text>
           <Text style={styles.modalSubtitle}>Create the same habit widgets you use on the frontend.</Text>
 
           <Text style={styles.fieldLabel}>Habit Name</Text>
@@ -211,12 +215,19 @@ function HabitFormModal({
   );
 }
 
+const formatGoalLabel = (goal?: Goal): string | null => {
+  if (!goal) return null;
+  if (goal.goalType === "DAILY") return "Every day";
+  return goal.goalType === "DAYS_PER_WEEK"
+    ? `${goal.targetDays}x / week`
+    : `${goal.targetDays}x / month`;
+};
+
 export default function HabitsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const queryClient = useQueryClient();
   const { token, signOut } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingHabit, setEditingHabit] = useState<Habit | undefined>();
   const [formState, setFormState] = useState<FormState>(createFormState());
 
   const habitsQuery = useQuery({
@@ -268,19 +279,11 @@ export default function HabitsScreen() {
 
   const closeModal = () => {
     setModalVisible(false);
-    setEditingHabit(undefined);
     setFormState(createFormState());
   };
 
   const openCreateModal = () => {
-    setEditingHabit(undefined);
     setFormState(createFormState());
-    setModalVisible(true);
-  };
-
-  const openEditModal = (habit: Habit) => {
-    setEditingHabit(habit);
-    setFormState(createFormState(habit));
     setModalVisible(true);
   };
 
@@ -308,16 +311,11 @@ export default function HabitsScreen() {
         throw new Error("Goal target days must be greater than 0");
       }
 
-      const savedHabit = editingHabit
-        ? await updateHabit(token, editingHabit.id, habitName, description)
-        : await createHabit(token, habitName, description);
+      const savedHabit = await createHabit(token, habitName, description);
 
       if (formState.goalEnabled) {
         const goal = await setGoal(token, savedHabit.id, formState.goalType, parsedTargetDays);
         savedHabit.goal = goal;
-      } else if (editingHabit?.goal) {
-        await deleteGoal(token, editingHabit.id);
-        delete savedHabit.goal;
       }
 
       return savedHabit;
@@ -333,18 +331,51 @@ export default function HabitsScreen() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (habitId: number) => {
+  const dayToggleMutation = useMutation({
+    mutationFn: async ({ habitId, date, nextStatus }: { habitId: number; date: string; nextStatus: DayStatus }) => {
       if (!token) throw new Error("AUTH_REQUIRED");
-      await deleteHabit(token, habitId);
+      if (nextStatus === "unknown") {
+        return deleteHabitLog(token, habitId, date);
+      }
+      return logHabit(token, habitId, date, toCompletedValue(nextStatus));
+    },
+    onMutate: async ({ habitId, date, nextStatus }) => {
+      const queryKey = ["habitWidgets", ...habitIds];
+      await queryClient.cancelQueries({ queryKey });
+      const previousWidgets = queryClient.getQueryData<WidgetData>(queryKey);
+
+      queryClient.setQueryData<WidgetData>(queryKey, (current) => {
+        const source = current || EMPTY_WIDGET_DATA;
+        const nextDays = { ...source.lastFourDaysByHabitId };
+        nextDays[habitId] = (nextDays[habitId] || []).map((day) =>
+          day.date === date ? { ...day, status: nextStatus } : day
+        );
+
+        return {
+          ...source,
+          lastFourDaysByHabitId: nextDays,
+        };
+      });
+
+      return { previousWidgets };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousWidgets) {
+        queryClient.setQueryData(["habitWidgets", ...habitIds], context.previousWidgets);
+      }
+
+      const message = error instanceof Error ? error.message : "Failed to update habit";
+      if (message === "AUTH_EXPIRED") {
+        void signOut();
+        return;
+      }
+
+      Alert.alert("Update failed", message);
     },
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["habits"] }),
-        queryClient.invalidateQueries({ queryKey: ["habitWidgets"] }),
-        queryClient.invalidateQueries({ queryKey: ["habitInsights"] }),
-        queryClient.invalidateQueries({ queryKey: ["habitCalendar"] }),
-      ]);
+      void queryClient.invalidateQueries({ queryKey: ["habitWidgets"] });
+      void queryClient.invalidateQueries({ queryKey: ["habitInsights"] });
+      void queryClient.invalidateQueries({ queryKey: ["habitCalendar"] });
     },
   });
 
@@ -426,66 +457,30 @@ export default function HabitsScreen() {
                   style={({ pressed }) => [styles.habitCard, pressed && styles.pressed]}
                 >
                   <View style={styles.habitTopRow}>
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={styles.habitTitle}>{habit.habitName}</Text>
-                      {habit.description ? <Text style={styles.habitDescription}>{habit.description}</Text> : null}
-                      {goalLabel ? <Text style={styles.goalText}>{goalLabel}</Text> : null}
+                    <View style={styles.habitMainColumn}>
+                      <Text numberOfLines={1} ellipsizeMode="tail" style={styles.habitTitle}>{habit.habitName}</Text>
+                      {goalLabel ? <Text numberOfLines={1} style={styles.goalText}>{goalLabel}</Text> : null}
                     </View>
 
-                    <View style={styles.cardActions}>
-                      <Pressable
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          openEditModal(habit);
-                        }}
-                        style={({ pressed }) => [styles.iconAction, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.iconActionText}>Edit</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={(event) => {
-                          event.stopPropagation();
-                          Alert.alert(
-                            "Delete habit?",
-                            `Remove \"${habit.habitName}\"?`,
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Delete",
-                                style: "destructive",
-                                onPress: () => {
-                                  deleteMutation.mutate(habit.id, {
-                                    onError: (error) => {
-                                      void handleMutationError(error, "Delete failed");
-                                    },
-                                  });
-                                },
-                              },
-                            ]
-                          );
-                        }}
-                        style={({ pressed }) => [styles.iconAction, styles.deleteAction, pressed && styles.pressed]}
-                      >
-                        <Text style={[styles.iconActionText, styles.deleteActionText]}>Delete</Text>
-                      </Pressable>
+                    <View style={styles.metricsCluster}>
+                      <MetricPill label="Pts" value={metrics?.habitScore ?? 0} />
+                      <MetricPill label="Mo" value={metrics?.monthlySuccess ?? 0} />
+                      <MetricPill label="Yr" value={metrics?.yearlySuccess ?? 0} />
                     </View>
                   </View>
 
-                  <View style={styles.recentStrip}>
+                  <View style={styles.recentInlineRow}>
                     {recentDays.map((day) => (
-                      <DayStatusBadge key={`${habit.id}-${day.date}`} date={day.date} status={day.status} />
+                      <DayStatusBadge
+                        key={`${habit.id}-${day.date}`}
+                        date={day.date}
+                        status={day.status}
+                        onPress={() => {
+                          const nextStatus = getNextDayStatus(day.status);
+                          dayToggleMutation.mutate({ habitId: habit.id, date: day.date, nextStatus });
+                        }}
+                      />
                     ))}
-                  </View>
-
-                  <View style={styles.metricsRow}>
-                    <MetricPill label="Points" value={metrics?.habitScore ?? 0} />
-                    <MetricPill label="Month" value={metrics?.monthlySuccess ?? 0} />
-                    <MetricPill label="Year" value={metrics?.yearlySuccess ?? 0} />
-                  </View>
-
-                  <View style={styles.insightHintRow}>
-                    <Text style={styles.insightHint}>Tap to open habit insights</Text>
-                    <Text style={styles.insightArrow}>›</Text>
                   </View>
                 </Pressable>
               );
@@ -496,7 +491,6 @@ export default function HabitsScreen() {
 
       <HabitFormModal
         visible={modalVisible}
-        editingHabit={editingHabit}
         formState={formState}
         setFormState={setFormState}
         isSaving={saveMutation.isPending}
@@ -552,67 +546,64 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
   emptyText: { fontSize: 13, color: "#6b7280", textAlign: "center" },
 
-  cardsColumn: { gap: 14 },
+  cardsColumn: { gap: 10 },
   habitCard: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "#d1fae5",
-    padding: 16,
-    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
     shadowColor: "#16a34a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  habitTopRow: { flexDirection: "row", gap: 12 },
-  habitTitle: { fontSize: 18, fontWeight: "800", color: "#111827" },
-  habitDescription: { fontSize: 13, color: "#4b5563" },
-  goalText: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
-  cardActions: { gap: 8 },
+  habitTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  habitMainColumn: { flex: 1, gap: 4, minWidth: 0 },
+  habitTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  goalText: { fontSize: 11, fontWeight: "700", color: "#6b7280" },
+  metricsCluster: { flexDirection: "row", gap: 4, alignSelf: "flex-start" },
   iconAction: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: "#d1fae5",
     backgroundColor: "#f8fdfb",
   },
-  iconActionText: { color: "#166534", fontSize: 12, fontWeight: "700" },
+  iconActionText: { color: "#166534", fontSize: 11, fontWeight: "700" },
   deleteAction: { borderColor: "#fecaca", backgroundColor: "#fff7f7" },
   deleteActionText: { color: "#b91c1c" },
 
-  recentStrip: {
+  recentInlineRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 10,
-    borderRadius: 16,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
-  dayStatusWrap: { alignItems: "center", gap: 5, flex: 1 },
-  dayStatusLabel: { fontSize: 11, fontWeight: "700", color: "#6b7280" },
-  dayStatusDot: { width: 28, height: 28, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  dayStatusGlyph: { fontSize: 15, fontWeight: "800" },
+  dayStatusWrap: { alignItems: "center", gap: 2, flex: 1 },
+  dayStatusLabel: { fontSize: 9, fontWeight: "700", color: "#6b7280" },
+  dayStatusDot: { width: 22, height: 22, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  dayStatusGlyph: { fontSize: 12, fontWeight: "800" },
 
-  metricsRow: { flexDirection: "row", gap: 10 },
   metricPill: {
-    flex: 1,
     borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    minWidth: 42,
+    borderRadius: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 5,
     alignItems: "center",
-    gap: 2,
+    gap: 1,
   },
-  metricValue: { fontSize: 18, fontWeight: "800" },
-  metricLabel: { fontSize: 11, fontWeight: "700", color: "#374151", textTransform: "uppercase" },
-
-  insightHintRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  insightHint: { fontSize: 12, fontWeight: "700", color: "#166534" },
-  insightArrow: { fontSize: 22, fontWeight: "800", color: "#16a34a", lineHeight: 24 },
+  metricValue: { fontSize: 14, fontWeight: "800" },
+  metricLabel: { fontSize: 8, fontWeight: "700", color: "#374151", textTransform: "uppercase" },
 
   modalBackdrop: {
     flex: 1,

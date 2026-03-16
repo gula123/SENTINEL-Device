@@ -132,6 +132,15 @@ export const logHabit = async (
     body: JSON.stringify({ logDate, completed }),
   });
 
+export const deleteHabitLog = async (
+  token: string,
+  habitId: number,
+  logDate: string
+): Promise<void> =>
+  requestVoid(`/habits/${habitId}/log?logDate=${encodeURIComponent(logDate)}`, token, {
+    method: "DELETE",
+  });
+
 export const getHabitLogs = async (
   token: string,
   habitId: number,
