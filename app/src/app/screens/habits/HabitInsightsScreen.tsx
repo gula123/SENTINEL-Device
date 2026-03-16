@@ -250,27 +250,10 @@ export default function HabitInsightsScreen() {
       }
       return deleteHabitLog(token, habitId, date);
     },
-    onMutate: async ({ date, currentValue }) => {
+    onMutate: async () => {
       const queryKey = ["habitCalendar", habitId, currentMonth.format("YYYY-MM")];
       await queryClient.cancelQueries({ queryKey });
       const previousLogs = queryClient.getQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey);
-
-      queryClient.setQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey, (current) => {
-        const existing = current || [];
-
-        if (currentValue === undefined) {
-          return [...existing, { logDate: date, completed: true }];
-        }
-
-        if (currentValue === true) {
-          return existing.map((log) =>
-            log.logDate === date ? { ...log, completed: false } : log
-          );
-        }
-
-        return existing.filter((log) => log.logDate !== date);
-      });
-
       return { previousLogs };
     },
     onError: (error, _variables, context) => {
@@ -621,7 +604,7 @@ export default function HabitInsightsScreen() {
                           styles.dayCell,
                           { backgroundColor, borderColor: isToday ? "#0f172a" : backgroundColor },
                           isToday && styles.todayRing,
-                          (pressed || logMutation.isPending) && styles.pressed,
+                          pressed && styles.pressed,
                         ]}
                       >
                         <Text style={[styles.dayCellText, { color: textColor }]}>{cell.day}</Text>
