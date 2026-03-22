@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -63,7 +64,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const [showCustom, setShowCustom] = useState(false);
+  const [isCreateMode, setIsCreateMode] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customBrandOrPlace, setCustomBrandOrPlace] = useState("");
   const [customCalories, setCustomCalories] = useState("0");
@@ -76,6 +77,22 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
+
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
+    toastAnim.setValue(0);
+    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start(() =>
+        setToastMessage(null)
+      );
+    }, 2200);
+  }
 
   const selectedPortion = useMemo(
     () => portions.find((portion) => portion.id === selectedPortionId) || null,
@@ -169,9 +186,8 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       setCustomGrams("100");
       setCustomBrandOrPlace("");
       setAiNote("");
-      setShowCustom(false);
       invalidate();
-      Alert.alert("Done", `Custom food logged to ${MEAL_LABEL[meal]}.`);
+      showToast(`${MEAL_LABEL[meal]}: food created and logged`);
     },
     onError: handleError,
   });
@@ -224,7 +240,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   }, [query]);
 
   useEffect(() => {
-    if (!token || debouncedQuery.trim().length < 2) {
+    if (!token || query.trim().length < 2 || debouncedQuery.trim().length < 2) {
       setResults([]);
       setSearching(false);
       return;
@@ -260,7 +276,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, token, selectedFood]);
+  }, [debouncedQuery, query, token, selectedFood]);
 
   const onSearch = (text: string) => {
     setQuery(text);
@@ -296,12 +312,14 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       });
       invalidate();
       setQuery("");
+      setDebouncedQuery("");
       setResults([]);
+      setSearching(false);
       setSelectedFood(null);
       setSelectedPortionId(null);
       setPortionAmount("1");
       setGrams("100");
-      Alert.alert("Added", `Food added to ${MEAL_LABEL[meal]}.`);
+      showToast(`Added to ${MEAL_LABEL[meal]}`);
     } catch (err) {
       handleError(err);
     }
@@ -410,9 +428,10 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
             <Text style={s.contextDate}>{date}</Text>
           </View>
 
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Search Food</Text>
-            {selectedFood ? (
+          {!isCreateMode ? (
+            <View style={s.card}>
+              <Text style={s.cardTitle}>Search Food</Text>
+              {selectedFood ? (
               <View style={s.selectedChip}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
@@ -438,7 +457,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   <Text style={s.clearBtnText}>✕</Text>
                 </Pressable>
               </View>
-            ) : (
+              ) : (
               <>
                 <TextInput
                   value={query}
@@ -484,9 +503,9 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   </View>
                 ) : null}
               </>
-            )}
+              )}
 
-            {selectedFoodPreview ? (
+              {selectedFoodPreview ? (
               <View style={s.previewBox}>
                 <Text style={s.previewTitle}>
                   {selectedPortion
@@ -500,9 +519,9 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   <Text style={s.previewItem}>🥑 {selectedFoodPreview.fats}g F</Text>
                 </View>
               </View>
-            ) : null}
+              ) : null}
 
-            <View style={s.row}>
+              <View style={s.row}>
               <TextInput
                 value={selectedPortion ? portionAmount : grams}
                 onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
@@ -519,15 +538,15 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
               >
                 <Text style={s.addBtnText}>{addMutation.isPending ? "Adding..." : "Add"}</Text>
               </Pressable>
-            </View>
+              </View>
 
-            {selectedPortion ? (
+              {selectedPortion ? (
               <Text style={s.portionAmountHint}>
                 Qty x {selectedPortion.portionName} = {Math.round(selectedFoodPreview?.grams ?? 0)}g
               </Text>
-            ) : null}
+              ) : null}
 
-            {selectedFood && portions.length > 0 ? (
+              {selectedFood && portions.length > 0 ? (
               <View style={s.portionWrap}>
                 <Text style={s.portionLabel}>Portions for this food</Text>
                 <View style={s.portionRow}>
@@ -568,7 +587,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   </Pressable>
                 </View>
               </View>
-            ) : selectedFood ? (
+              ) : selectedFood ? (
               <View style={s.portionWrap}>
                 <Text style={s.portionLabel}>No saved portions yet</Text>
                 <Pressable
@@ -578,9 +597,9 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   <Text style={s.portionChipAddText}>+ Add first portion</Text>
                 </Pressable>
               </View>
-            ) : null}
+              ) : null}
 
-            {selectedFood && showAddPortionForm ? (
+              {selectedFood && showAddPortionForm ? (
               <View style={s.addPortionBox}>
                 <Text style={s.addPortionTitle}>Add portion for {selectedFood.name}</Text>
                 <View style={s.portionRow}>
@@ -613,17 +632,24 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   </Pressable>
                 </View>
               </View>
-            ) : null}
-          </View>
+              ) : null}
 
-          <Pressable
-            onPress={() => setShowCustom((v) => !v)}
-            style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
-          >
-            <Text style={s.customToggleText}>{showCustom ? "▲ Hide Create New Food" : "▼ Create New Food"}</Text>
-          </Pressable>
+              <Pressable
+                onPress={() => setIsCreateMode(true)}
+                style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
+              >
+                <Text style={s.customToggleText}>▼ Create New Food</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => setIsCreateMode(false)}
+                style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
+              >
+                <Text style={s.customToggleText}>← Back to Search Food</Text>
+              </Pressable>
 
-          {showCustom ? (
             <View style={s.card}>
               <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
               <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set log grams for what you ate now.</Text>
@@ -662,7 +688,8 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 <Text style={s.addBtnText}>{createCustomMutation.isPending ? "Saving..." : "Create & Log"}</Text>
               </Pressable>
             </View>
-          ) : null}
+            </>
+          )}
 
           <Pressable
             onPress={() => navigation.goBack()}
@@ -673,6 +700,28 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
             <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
           </Pressable>
         </ScrollView>
+
+        {toastMessage ? (
+          <Animated.View
+            style={[
+              s.toast,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [12, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={s.toastText}>✓  {toastMessage}</Text>
+          </Animated.View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -895,4 +944,22 @@ const s = StyleSheet.create({
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   pressed: { opacity: 0.65 },
+
+  toast: {
+    position: "absolute",
+    bottom: 24,
+    left: 24,
+    right: 24,
+    backgroundColor: "#166534",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });

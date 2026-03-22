@@ -1,9 +1,10 @@
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -107,6 +108,33 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const settingsQuery = useUserSettings();
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editingGrams, setEditingGrams] = useState("");
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string) => {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
+
+    setToastMessage(message);
+    toastAnim.setValue(0);
+    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start(() => {
+        setToastMessage(null);
+      });
+    }, 2200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) {
+        clearTimeout(toastTimer.current);
+      }
+    };
+  }, []);
 
   const currentMealLogs = useMemo(
     () => (logsQuery.data || []).filter((item) => (item.mealType || "SNACKS") === meal),
@@ -479,26 +507,37 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const performDelete = async (logId: number) => {
+    try {
+      await deleteMutation.mutateAsync(logId);
+      invalidate();
+      onCancelEditLog();
+      showToast("Food removed from this meal.");
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
   const onDeleteLog = () => {
     if (!editingLog) return;
+    const logToDelete = editingLog;
+
+    // Alert confirmation can fail silently on web, so execute directly there.
+    if (Platform.OS === "web") {
+      void performDelete(logToDelete.id);
+      return;
+    }
 
     Alert.alert(
       "Delete food",
-      `Delete ${editingLog.foodName} from this meal?`,
+      `Delete ${logToDelete.foodName} from this meal?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteMutation.mutateAsync(editingLog.id);
-              invalidate();
-              onCancelEditLog();
-              Alert.alert("Deleted", "Food removed from this meal.");
-            } catch (err) {
-              handleError(err);
-            }
+          onPress: () => {
+            void performDelete(logToDelete.id);
           },
         },
       ]
@@ -703,6 +742,28 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           </Pressable>
 
         </ScrollView>
+
+        {toastMessage ? (
+          <Animated.View
+            style={[
+              s.toast,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [12, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={s.toastText}>✓  {toastMessage}</Text>
+          </Animated.View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -970,4 +1031,22 @@ const s = StyleSheet.create({
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   pressed: { opacity: 0.65 },
+
+  toast: {
+    position: "absolute",
+    bottom: 24,
+    left: 24,
+    right: 24,
+    backgroundColor: "#166534",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });
