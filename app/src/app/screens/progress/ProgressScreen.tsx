@@ -1,9 +1,10 @@
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import {
   ActivityIndicator,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -64,6 +65,18 @@ const STATUS_LABEL: Record<ColorCategory, string> = {
 // ─── Screen ─────────────────────────────────────────────────────────────────
 export default function ProgressScreen() {
   const [month, setMonth] = useState(dayjs().startOf("month"));
+
+  const calendarPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 2,
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx < -50) setMonth((v) => v.add(1, "month"));
+        else if (dx > 50) setMonth((v) => v.subtract(1, "month"));
+      },
+    })
+  ).current;
+
   const { signOut } = useAuth();
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, "Progress">>();
   const yearMonth = month.format("YYYY-MM");
@@ -223,7 +236,7 @@ export default function ProgressScreen() {
             </View>
 
             {/* ── Calendar card ────────────────────────────────────────── */}
-            <View style={styles.calendarCard}>
+            <View style={styles.calendarCard} {...calendarPanResponder.panHandlers}>
               {/* Weekday header */}
               <View style={styles.weekRow}>
                 {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (

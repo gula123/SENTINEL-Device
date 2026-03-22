@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -187,6 +188,17 @@ export default function HabitInsightsScreen() {
   const { habitId, habitName } = route.params;
   const { width } = useWindowDimensions();
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
+
+  const calendarPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 2,
+      onPanResponderRelease: (_, { dx }) => {
+        if (dx < -50) setCurrentMonth((v) => v.add(1, "month"));
+        else if (dx > 50) setCurrentMonth((v) => v.subtract(1, "month"));
+      },
+    })
+  ).current;
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState({ habitName }));
 
@@ -561,7 +573,7 @@ export default function HabitInsightsScreen() {
               )}
             </View>
 
-            <View style={styles.calendarCard}>
+            <View style={styles.calendarCard} {...calendarPanResponder.panHandlers}>
               <View style={styles.calendarHeader}>
                 <Pressable onPress={() => setCurrentMonth((value) => value.subtract(1, "month"))} style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}>
                   <Text style={styles.monthBtnText}>‹</Text>
