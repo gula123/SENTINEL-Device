@@ -182,7 +182,7 @@ export default function WeightDiaryScreen() {
     return { min, max, axisMin, axisMax, tickInterval, segments, labelStep };
   }, [chartData]);
 
-  const chartWidth = Math.max(304, windowWidth - 72);
+  const chartWidth = Math.max(280, windowWidth - 68);
   const chartLabels = useMemo(() => {
     if (chartData.length === 0) return [] as string[];
     return chartData.map((point, index) => {
@@ -213,9 +213,6 @@ export default function WeightDiaryScreen() {
     return smoothOnce(smoothOnce(raw));
   }, [chartData]);
 
-  const axisFloorDataset = useMemo(() => chartData.map(() => chartMetrics.axisMin), [chartData, chartMetrics.axisMin]);
-  const axisCeilDataset = useMemo(() => chartData.map(() => chartMetrics.axisMax), [chartData, chartMetrics.axisMax]);
-
   const stats = statsQuery.data;
 
   return (
@@ -241,37 +238,28 @@ export default function WeightDiaryScreen() {
             <Text style={s.muted}>No weight data yet.</Text>
           ) : (
             <>
+              <Text style={s.chartSub}>Last 24 entries</Text>
               <View style={s.chartBox}>
                 <LineChart
                   data={{
                     labels: chartLabels,
                     datasets: [
-                      { data: chartDataset, strokeWidth: 3 },
-                      {
-                        data: axisFloorDataset,
-                        strokeWidth: 1.6,
-                        color: () => "#64748b99",
-                      },
-                      {
-                        data: axisCeilDataset,
-                        strokeWidth: 0,
-                        color: () => "transparent",
-                      },
+                      { data: chartDataset, strokeWidth: 2.8, color: () => "#16a34a" },
                     ],
                   }}
                   width={chartWidth}
-                  height={180}
+                  height={220}
                   fromNumber={chartMetrics.axisMin}
                   withShadow={false}
                   withInnerLines
-                  withOuterLines
+                  withOuterLines={false}
                   withVerticalLines={false}
                   withHorizontalLabels
                   withVerticalLabels
                   withDots={false}
-                  yLabelsOffset={6}
-                  xLabelsOffset={2}
-                  segments={chartMetrics.segments}
+                  yLabelsOffset={4}
+                  xLabelsOffset={4}
+                  segments={Math.max(4, chartMetrics.segments)}
                   formatYLabel={(value) => {
                     const numeric = Number(value);
                     if (!Number.isFinite(numeric)) {
@@ -280,11 +268,11 @@ export default function WeightDiaryScreen() {
                     return chartMetrics.labelStep < 1 ? numeric.toFixed(1) : numeric.toFixed(0);
                   }}
                   chartConfig={{
-                    backgroundColor: "#f0fdf4",
-                    backgroundGradientFrom: "#f0fdf4",
-                    backgroundGradientTo: "#f0fdf4",
+                    backgroundColor: "#f8fafc",
+                    backgroundGradientFrom: "#f8fafc",
+                    backgroundGradientTo: "#f8fafc",
                     decimalPlaces: 1,
-                    color: () => "#16a34a",
+                    color: () => "#111827",
                     labelColor: () => "#4b5563",
                     propsForDots: {
                       r: "2",
@@ -299,7 +287,7 @@ export default function WeightDiaryScreen() {
                       fontSize: 11,
                     },
                   }}
-                  bezier={false}
+                  bezier
                   style={s.chart}
                 />
               </View>
@@ -398,22 +386,21 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   cardTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 },
+  chartSub: { marginTop: -2, fontSize: 12, color: "#6b7280" },
   muted: { fontSize: 12, color: "#6b7280" },
 
   chartBox: {
-    minHeight: 180,
+    minHeight: 220,
     position: "relative",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#dcfce7",
-    backgroundColor: "#f0fdf4",
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
     overflow: "hidden",
   },
   chart: {
-    borderRadius: 10,
+    borderRadius: 12,
     alignSelf: "center",
-    marginLeft: -36,
-    marginRight: -20,
   },
 
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
