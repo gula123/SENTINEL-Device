@@ -6,8 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,6 +43,9 @@ type FormState = {
   targetDays: string;
 };
 
+type HabitCalendarLog = { logDate: string; completed: boolean };
+const CALENDAR_MONTHS_RANGE = 60;
+
 const createFormState = (habit?: { habitName: string; description?: string; goal?: Goal }): FormState => ({
   habitName: habit?.habitName ?? "",
   description: habit?.description ?? "",
@@ -50,6 +53,29 @@ const createFormState = (habit?: { habitName: string; description?: string; goal
   goalType: habit?.goal?.goalType === "DAYS_PER_MONTH" ? "DAYS_PER_MONTH" : "DAYS_PER_WEEK",
   targetDays: habit?.goal?.targetDays ? String(habit.goal.targetDays) : "4",
 });
+
+function buildMonthWeeks(month: dayjs.Dayjs) {
+  const monthDays = month.daysInMonth();
+  const monthOffset = (month.startOf("month").day() + 6) % 7;
+  const monthCells = [
+    ...Array.from({ length: monthOffset }, (_, index) => ({ key: `lead-${index}`, day: 0 })),
+    ...Array.from({ length: monthDays }, (_, index) => ({ key: `day-${index + 1}`, day: index + 1 })),
+  ];
+
+  const rows: Array<typeof monthCells> = [];
+  for (let index = 0; index < monthCells.length; index += 7) {
+    rows.push(monthCells.slice(index, index + 7));
+  }
+  return rows;
+}
+
+function toLogsMap(logs?: HabitCalendarLog[]) {
+  const map: Record<string, boolean> = {};
+  (logs || []).forEach((log) => {
+    map[log.logDate] = log.completed;
+  });
+  return map;
+}
 
 function HabitManageModal({
   visible,
@@ -180,6 +206,101 @@ function InsightStat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function HabitCalendarMonthPage({
+  token,
+  habitId,
+  month,
+  pageWidth,
+  onPrevMonth,
+  onNextMonth,
+  onDayTap,
+}: {
+  token: string | null;
+  habitId: number;
+  month: dayjs.Dayjs;
+  pageWidth: number;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onDayTap: (date: string, currentValue?: boolean) => void;
+}) {
+  const calendarQuery = useQuery({
+    queryKey: ["habitCalendar", habitId, month.format("YYYY-MM")],
+    queryFn: async () => {
+      if (!token) throw new Error("AUTH_REQUIRED");
+      return getHabitLogs(
+        token,
+        habitId,
+        month.startOf("month").format("YYYY-MM-DD"),
+        month.endOf("month").format("YYYY-MM-DD")
+      );
+    },
+    enabled: Boolean(token),
+  });
+
+  const pageWeeks = useMemo(() => buildMonthWeeks(month), [month]);
+  const logsMap = useMemo(() => toLogsMap(calendarQuery.data), [calendarQuery.data]);
+
+  return (
+    <View style={[styles.calendarPage, { width: pageWidth }]}> 
+      <View style={styles.calendarHeader}>
+        <Pressable onPress={onPrevMonth} style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}>
+          <Text style={styles.monthBtnText}>‹</Text>
+        </Pressable>
+        <Text style={styles.monthLabel}>{month.format("MMMM YYYY")}</Text>
+        <Pressable onPress={onNextMonth} style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}>
+          <Text style={styles.monthBtnText}>›</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.weekHeader}>
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
+          <Text key={`${month.format("YYYY-MM")}-${label}`} style={styles.weekHeaderText}>{label}</Text>
+        ))}
+      </View>
+
+      {calendarQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" /> : null}
+
+      {calendarQuery.isError ? (
+        <Text style={styles.calendarErrorText}>Could not load this month.</Text>
+      ) : null}
+
+      {pageWeeks.map((week, rowIndex) => (
+        <View key={`${month.format("YYYY-MM")}-w-${rowIndex}`} style={styles.weekRow}>
+          {(week.length < 7
+            ? [...week, ...Array.from({ length: 7 - week.length }, (_, fillIndex) => ({ key: `fill-${rowIndex}-${fillIndex}`, day: 0 }))]
+            : week
+          ).map((cell) => {
+            if (cell.day === 0) {
+              return <View key={`${month.format("YYYY-MM")}-${cell.key}`} style={styles.emptyDayCell} />;
+            }
+
+            const date = month.date(cell.day).format("YYYY-MM-DD");
+            const value = logsMap[date];
+            const isToday = dayjs().format("YYYY-MM-DD") === date;
+            const backgroundColor = value === true ? "#16a34a" : value === false ? "#ef4444" : "#f3f4f6";
+            const textColor = value === undefined ? "#374151" : "#ffffff";
+
+            return (
+              <Pressable
+                key={`${month.format("YYYY-MM")}-${cell.key}`}
+                onPress={() => onDayTap(date, value)}
+                style={({ pressed }) => [
+                  styles.dayCell,
+                  { backgroundColor, borderColor: isToday ? "#0f172a" : backgroundColor },
+                  isToday && styles.todayRing,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.dayCellText, { color: textColor }]}>{cell.day}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function HabitInsightsScreen() {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
@@ -187,20 +308,21 @@ export default function HabitInsightsScreen() {
   const route = useRoute<HabitInsightsRoute>();
   const { habitId, habitName } = route.params;
   const { width } = useWindowDimensions();
-  const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
-
-  const calendarPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
-        Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 2,
-      onPanResponderRelease: (_, { dx }) => {
-        if (dx < -50) setCurrentMonth((v) => v.add(1, "month"));
-        else if (dx > 50) setCurrentMonth((v) => v.subtract(1, "month"));
-      },
-    })
-  ).current;
+  const [activeMonthIndex, setActiveMonthIndex] = useState(CALENDAR_MONTHS_RANGE);
+  const calendarPagerRef = useRef<FlatList<string>>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState({ habitName }));
+
+  const calendarMonths = useMemo(() => {
+    const base = dayjs().startOf("month");
+    const items: string[] = [];
+    for (let i = -CALENDAR_MONTHS_RANGE; i <= CALENDAR_MONTHS_RANGE; i++) {
+      items.push(base.add(i, "month").format("YYYY-MM-01"));
+    }
+    return items;
+  }, []);
+
+  const currentMonth = dayjs(calendarMonths[activeMonthIndex] || dayjs().startOf("month").format("YYYY-MM-01"));
 
   const habitsQuery = useQuery({
     queryKey: ["habits"],
@@ -237,19 +359,6 @@ export default function HabitInsightsScreen() {
     enabled: Boolean(token),
   });
 
-  const calendarQuery = useQuery({
-    queryKey: ["habitCalendar", habitId, currentMonth.format("YYYY-MM")],
-    queryFn: async () => {
-      if (!token) throw new Error("AUTH_REQUIRED");
-      return getHabitLogs(
-        token,
-        habitId,
-        currentMonth.startOf("month").format("YYYY-MM-DD"),
-        currentMonth.endOf("month").format("YYYY-MM-DD")
-      );
-    },
-    enabled: Boolean(token),
-  });
 
   const logMutation = useMutation({
     mutationFn: async ({ date, currentValue }: { date: string; currentValue?: boolean }) => {
@@ -262,15 +371,15 @@ export default function HabitInsightsScreen() {
       }
       return deleteHabitLog(token, habitId, date);
     },
-    onMutate: async () => {
-      const queryKey = ["habitCalendar", habitId, currentMonth.format("YYYY-MM")];
+    onMutate: async (variables) => {
+      const queryKey = ["habitCalendar", habitId, dayjs(variables.date).format("YYYY-MM")];
       await queryClient.cancelQueries({ queryKey });
-      const previousLogs = queryClient.getQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey);
-      return { previousLogs };
+      const previousLogs = queryClient.getQueryData<HabitCalendarLog[]>(queryKey);
+      return { previousLogs, queryKey };
     },
     onError: (error, _variables, context) => {
-      if (context?.previousLogs) {
-        queryClient.setQueryData(["habitCalendar", habitId, currentMonth.format("YYYY-MM")], context.previousLogs);
+      if (context?.previousLogs && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousLogs);
       }
 
       void handleError(error, "Failed to update habit day");
@@ -329,8 +438,7 @@ export default function HabitInsightsScreen() {
   });
 
   const isAuthExpired =
-    (insightsQuery.error instanceof Error && insightsQuery.error.message === "AUTH_EXPIRED") ||
-    (calendarQuery.error instanceof Error && calendarQuery.error.message === "AUTH_EXPIRED");
+    insightsQuery.error instanceof Error && insightsQuery.error.message === "AUTH_EXPIRED";
 
   const handleError = async (error: unknown, title: string) => {
     const message = error instanceof Error ? error.message : title;
@@ -342,16 +450,9 @@ export default function HabitInsightsScreen() {
   };
 
   const chartWidth = Math.max(280, width - 72);
+  const [calendarPagerWidth, setCalendarPagerWidth] = useState(chartWidth);
 
   const pageTitle = habitRecord?.habitName ?? habitName;
-
-  const logsMap = useMemo(() => {
-    const map: Record<string, boolean> = {};
-    (calendarQuery.data || []).forEach((log) => {
-      map[log.logDate] = log.completed;
-    });
-    return map;
-  }, [calendarQuery.data]);
 
   // Debounce handler for day taps - optimistic UI updates immediately, backend call debounced
   const debouncedLogRef = useRef<{ date: string; currentValue?: boolean } | null>(null);
@@ -380,10 +481,9 @@ export default function HabitInsightsScreen() {
       }, 300);
 
       // Optimistic UI update - immediately cycle through states for smooth feel
-      const queryKey = ["habitCalendar", habitId, currentMonth.format("YYYY-MM")];
-      const previousLogs = queryClient.getQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey);
+      const queryKey = ["habitCalendar", habitId, dayjs(date).format("YYYY-MM")];
 
-      queryClient.setQueryData<Array<{ logDate: string; completed: boolean }>>(queryKey, (current) => {
+      queryClient.setQueryData<HabitCalendarLog[]>(queryKey, (current) => {
         const existing = current || [];
 
         if (currentValue === undefined) {
@@ -399,7 +499,7 @@ export default function HabitInsightsScreen() {
         return existing.filter((log) => log.logDate !== date);
       });
     },
-    [habitId, currentMonth, queryClient, logMutation, handleError]
+    [habitId, queryClient, logMutation, handleError]
   );
 
   const scoreChart = useMemo(() => {
@@ -418,22 +518,22 @@ export default function HabitInsightsScreen() {
     };
   }, [insightsQuery.data?.monthlyStats]);
 
-  const monthDays = currentMonth.daysInMonth();
-  // Adjust offset for Monday start: dayjs returns 0=Sun, so we need (day + 6) % 7 for Mon=0
-  const monthOffset = (currentMonth.startOf("month").day() + 6) % 7;
-  const monthCells = useMemo(() => {
-    const leading = Array.from({ length: monthOffset }, (_, index) => ({ key: `lead-${index}`, day: 0 }));
-    const days = Array.from({ length: monthDays }, (_, index) => ({ key: `day-${index + 1}`, day: index + 1 }));
-    return [...leading, ...days];
-  }, [monthDays, monthOffset]);
-
-  const weeks = useMemo(() => {
-    const rows: Array<typeof monthCells> = [];
-    for (let index = 0; index < monthCells.length; index += 7) {
-      rows.push(monthCells.slice(index, index + 7));
+  const calendarViewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
+  const onCalendarViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setActiveMonthIndex(viewableItems[0].index);
     }
-    return rows;
-  }, [monthCells]);
+  });
+
+  const triggerPrevMonth = () => {
+    const nextIndex = Math.max(0, activeMonthIndex - 1);
+    calendarPagerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+  };
+
+  const triggerNextMonth = () => {
+    const nextIndex = Math.min(calendarMonths.length - 1, activeMonthIndex + 1);
+    calendarPagerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -488,13 +588,13 @@ export default function HabitInsightsScreen() {
           </View>
         ) : null}
 
-        {insightsQuery.isError || calendarQuery.isError ? (
+        {insightsQuery.isError ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>{isAuthExpired ? "Session expired" : "Failed to load habit insights"}</Text>
             <Text style={styles.errorText}>
               {isAuthExpired
                 ? "Please sign in again."
-                : (insightsQuery.error as Error)?.message || (calendarQuery.error as Error)?.message}
+                : (insightsQuery.error as Error)?.message}
             </Text>
             <View style={styles.actionRow}>
               {isAuthExpired ? (
@@ -505,7 +605,6 @@ export default function HabitInsightsScreen() {
               <Pressable
                 onPress={() => {
                   void insightsQuery.refetch();
-                  void calendarQuery.refetch();
                 }}
                 style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
               >
@@ -573,60 +672,45 @@ export default function HabitInsightsScreen() {
               )}
             </View>
 
-            <View style={styles.calendarCard} {...calendarPanResponder.panHandlers}>
-              <View style={styles.calendarHeader}>
-                <Pressable onPress={() => setCurrentMonth((value) => value.subtract(1, "month"))} style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}>
-                  <Text style={styles.monthBtnText}>‹</Text>
-                </Pressable>
-                <Text style={styles.monthLabel}>{currentMonth.format("MMMM YYYY")}</Text>
-                <Pressable onPress={() => setCurrentMonth((value) => value.add(1, "month"))} style={({ pressed }) => [styles.monthBtn, pressed && styles.pressed]}>
-                  <Text style={styles.monthBtnText}>›</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.weekHeader}>
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
-                  <Text key={label} style={styles.weekHeaderText}>{label}</Text>
-                ))}
-              </View>
-
-              {calendarQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" /> : null}
-
-              {weeks.map((week, rowIndex) => (
-                <View key={`week-${rowIndex}`} style={styles.weekRow}>
-                  {(week.length < 7
-                    ? [...week, ...Array.from({ length: 7 - week.length }, (_, fillIndex) => ({ key: `fill-${rowIndex}-${fillIndex}`, day: 0 }))]
-                    : week
-                  ).map((cell) => {
-                    if (cell.day === 0) {
-                      return <View key={cell.key} style={styles.emptyDayCell} />;
-                    }
-
-                    const date = currentMonth.date(cell.day).format("YYYY-MM-DD");
-                    const value = logsMap[date];
-                    const isToday = dayjs().format("YYYY-MM-DD") === date;
-                    const backgroundColor = value === true ? "#16a34a" : value === false ? "#ef4444" : "#f3f4f6";
-                    const textColor = value === undefined ? "#374151" : "#ffffff";
-
+            <View style={styles.calendarCard}>
+              <View
+                onLayout={(event) => {
+                  const nextWidth = Math.max(1, Math.round(event.nativeEvent.layout.width));
+                  if (nextWidth !== calendarPagerWidth) {
+                    setCalendarPagerWidth(nextWidth);
+                  }
+                }}
+              >
+                <FlatList
+                  ref={calendarPagerRef}
+                  data={calendarMonths}
+                  horizontal
+                  pagingEnabled
+                  bounces={false}
+                  showsHorizontalScrollIndicator={false}
+                  initialScrollIndex={CALENDAR_MONTHS_RANGE}
+                  getItemLayout={(_, index) => ({ length: calendarPagerWidth, offset: calendarPagerWidth * index, index })}
+                  keyExtractor={(item) => item}
+                  onViewableItemsChanged={onCalendarViewableItemsChanged.current}
+                  viewabilityConfig={calendarViewabilityConfig.current}
+                  renderItem={({ item }) => {
+                    const month = dayjs(item);
                     return (
-                      <Pressable
-                        key={cell.key}
-                        onPress={() => handleDayTap(date, value)}
-                        style={({ pressed }) => [
-                          styles.dayCell,
-                          { backgroundColor, borderColor: isToday ? "#0f172a" : backgroundColor },
-                          isToday && styles.todayRing,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <Text style={[styles.dayCellText, { color: textColor }]}>{cell.day}</Text>
-                      </Pressable>
+                      <HabitCalendarMonthPage
+                        token={token}
+                        habitId={habitId}
+                        month={month}
+                        pageWidth={calendarPagerWidth}
+                        onPrevMonth={triggerPrevMonth}
+                        onNextMonth={triggerNextMonth}
+                        onDayTap={handleDayTap}
+                      />
                     );
-                  })}
-                </View>
-              ))}
+                  }}
+                />
+              </View>
 
-              <Text style={styles.calendarHint}>Tap a day to toggle success and failure.</Text>
+              <Text style={styles.calendarHint}>Swipe month, tap a day to toggle success/failure.</Text>
             </View>
           </>
         ) : null}
@@ -740,6 +824,7 @@ const styles = StyleSheet.create({
   },
   monthBtnText: { fontSize: 22, fontWeight: "800", color: "#16a34a", lineHeight: 24 },
   monthLabel: { fontSize: 17, fontWeight: "800", color: "#111827" },
+  calendarPage: { gap: 12 },
   weekHeader: { flexDirection: "row" },
   weekHeaderText: { flex: 1, textAlign: "center", fontSize: 11, fontWeight: "700", color: "#6b7280" },
   weekRow: { flexDirection: "row", gap: 6 },
@@ -755,6 +840,7 @@ const styles = StyleSheet.create({
   todayRing: { borderWidth: 2 },
   dayCellText: { fontWeight: "800" },
   calendarHint: { fontSize: 12, color: "#6b7280" },
+  calendarErrorText: { fontSize: 12, color: "#b91c1c" },
 
   modalBackdrop: {
     flex: 1,
