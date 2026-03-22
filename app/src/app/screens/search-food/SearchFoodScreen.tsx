@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,8 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { useAddFoodLog, useDeleteFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
-import { useUserSettings } from "../../hooks/useUserSettings";
+import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import {
   createFoodPortion,
   createCustomFood,
@@ -31,7 +29,6 @@ import {
   type FoodItem,
   type MealType,
 } from "../../services/food/foodLogsApi";
-import { resolvePerDayLimitsForEdit } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
 
 const MEAL_LABEL: Record<MealType, string> = {
@@ -47,31 +44,9 @@ const MEAL_ICON: Record<MealType, string> = {
   SNACKS: "🍎",
 };
 
-const mealKeyByType = {
-  BREAKFAST: "breakfast",
-  LUNCH: "lunch",
-  DINNER: "dinner",
-  SNACKS: "snacks",
-} as const;
+type Props = NativeStackScreenProps<MainStackParamList, "SearchFood">;
 
-const LIMIT_OK_COLOR = "#16a34a";
-const LIMIT_BAD_COLOR = "#dc2626";
-
-function resolveLimitColor(value: number, limit: number, invert = false): string {
-  if (!Number.isFinite(limit) || limit <= 0) {
-    return LIMIT_OK_COLOR;
-  }
-
-  if (invert) {
-    return value >= limit ? LIMIT_OK_COLOR : LIMIT_BAD_COLOR;
-  }
-
-  return value > limit ? LIMIT_BAD_COLOR : LIMIT_OK_COLOR;
-}
-
-type Props = NativeStackScreenProps<MainStackParamList, "LogFood">;
-
-export default function LogFoodScreen({ route, navigation }: Props) {
+export default function SearchFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
 
   const [query, setQuery] = useState("");
@@ -101,36 +76,6 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
-  const updateMutation = useUpdateFoodLog(date);
-  const deleteMutation = useDeleteFoodLog(date);
-  const logsQuery = useFoodLogs(date);
-  const settingsQuery = useUserSettings();
-  const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [editingGrams, setEditingGrams] = useState("");
-
-  const currentMealLogs = useMemo(
-    () => (logsQuery.data || []).filter((item) => (item.mealType || "SNACKS") === meal),
-    [logsQuery.data, meal]
-  );
-
-  const consumed = useMemo(() => {
-    return currentMealLogs.reduce(
-      (acc, item) => ({
-        calories: acc.calories + (item.calories || 0),
-        protein: acc.protein + (item.protein || 0),
-        carbs: acc.carbs + (item.carbs || 0),
-        fats: acc.fats + (item.fats || 0),
-      }),
-      { calories: 0, protein: 0, carbs: 0, fats: 0 }
-    );
-  }, [currentMealLogs]);
-
-  const mealLimits = useMemo(() => {
-    const perDay = resolvePerDayLimitsForEdit(settingsQuery.data);
-    const dayName = dayjs(date).format("dddd");
-    const key = mealKeyByType[meal];
-    return perDay[dayName]?.meals[key] || { calories: 0, protein: 0, carbs: 0, fats: 0 };
-  }, [settingsQuery.data, date, meal]);
 
   const selectedPortion = useMemo(
     () => portions.find((portion) => portion.id === selectedPortionId) || null,
@@ -160,36 +105,6 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     };
   }, [selectedFood, resolvedGrams]);
 
-  const mealSummaryColors = useMemo(() => {
-    return {
-      calories: resolveLimitColor(consumed.calories, mealLimits.calories),
-      protein: resolveLimitColor(consumed.protein, mealLimits.protein, true),
-      carbs: resolveLimitColor(consumed.carbs, mealLimits.carbs),
-      fats: resolveLimitColor(consumed.fats, mealLimits.fats),
-    };
-  }, [consumed, mealLimits]);
-
-  const selectedPreviewTotals = useMemo(() => {
-    if (!selectedFoodPreview) return null;
-
-    const totals = {
-      calories: consumed.calories + selectedFoodPreview.calories,
-      protein: consumed.protein + selectedFoodPreview.protein,
-      carbs: consumed.carbs + selectedFoodPreview.carbs,
-      fats: consumed.fats + selectedFoodPreview.fats,
-    };
-
-    return {
-      totals,
-      colors: {
-        calories: resolveLimitColor(totals.calories, mealLimits.calories),
-        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
-        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
-        fats: resolveLimitColor(totals.fats, mealLimits.fats),
-      },
-    };
-  }, [selectedFoodPreview, consumed, mealLimits]);
-
   const customFoodPreview = useMemo(() => {
     const parsedGrams = Number(customGrams);
     const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
@@ -198,6 +113,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     const protein = Number(customProtein) || 0;
     const carbs = Number(customCarbs) || 0;
     const fats = Number(customFats) || 0;
+
     return {
       grams: g,
       calories: Math.round(calories * factor),
@@ -206,69 +122,6 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       fats: Math.round(fats * factor * 10) / 10,
     };
   }, [customCalories, customProtein, customCarbs, customFats, customGrams]);
-
-  const customPreviewTotals = useMemo(() => {
-    if (!customFoodPreview) return null;
-
-    const totals = {
-      calories: consumed.calories + customFoodPreview.calories,
-      protein: consumed.protein + customFoodPreview.protein,
-      carbs: consumed.carbs + customFoodPreview.carbs,
-      fats: consumed.fats + customFoodPreview.fats,
-    };
-
-    return {
-      totals,
-      colors: {
-        calories: resolveLimitColor(totals.calories, mealLimits.calories),
-        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
-        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
-        fats: resolveLimitColor(totals.fats, mealLimits.fats),
-      },
-    };
-  }, [customFoodPreview, consumed, mealLimits]);
-
-  const editingLog = useMemo(
-    () => currentMealLogs.find((item) => item.id === editingLogId) || null,
-    [currentMealLogs, editingLogId]
-  );
-
-  const editingPreview = useMemo(() => {
-    if (!editingLog) return null;
-    const parsedGrams = Number(editingGrams);
-    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
-    const baseGrams = editingLog.grams > 0 ? editingLog.grams : 100;
-    const factor = g / baseGrams;
-
-    return {
-      grams: g,
-      calories: Math.round((editingLog.calories || 0) * factor),
-      protein: Math.round((editingLog.protein || 0) * factor * 10) / 10,
-      carbs: Math.round((editingLog.carbs || 0) * factor * 10) / 10,
-      fats: Math.round((editingLog.fats || 0) * factor * 10) / 10,
-    };
-  }, [editingLog, editingGrams]);
-
-  const editingPreviewTotals = useMemo(() => {
-    if (!editingLog || !editingPreview) return null;
-
-    const totals = {
-      calories: consumed.calories - (editingLog.calories || 0) + editingPreview.calories,
-      protein: consumed.protein - (editingLog.protein || 0) + editingPreview.protein,
-      carbs: consumed.carbs - (editingLog.carbs || 0) + editingPreview.carbs,
-      fats: consumed.fats - (editingLog.fats || 0) + editingPreview.fats,
-    };
-
-    return {
-      totals,
-      colors: {
-        calories: resolveLimitColor(totals.calories, mealLimits.calories),
-        protein: resolveLimitColor(totals.protein, mealLimits.protein, true),
-        carbs: resolveLimitColor(totals.carbs, mealLimits.carbs),
-        fats: resolveLimitColor(totals.fats, mealLimits.fats),
-      },
-    };
-  }, [editingLog, editingPreview, consumed, mealLimits]);
 
   const aiMutation = useMutation({
     mutationFn: async (name: string): Promise<AiFoodEstimate> => {
@@ -308,12 +161,17 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       });
     },
     onSuccess: () => {
-      setCustomName(""); setCustomCalories("0"); setCustomProtein("0");
-      setCustomCarbs("0"); setCustomFats("0"); setCustomGrams("100");
+      setCustomName("");
+      setCustomCalories("0");
+      setCustomProtein("0");
+      setCustomCarbs("0");
+      setCustomFats("0");
+      setCustomGrams("100");
       setCustomBrandOrPlace("");
-      setAiNote(""); setShowCustom(false);
+      setAiNote("");
+      setShowCustom(false);
       invalidate();
-      Alert.alert("Done", "Custom food logged.");
+      Alert.alert("Done", `Custom food logged to ${MEAL_LABEL[meal]}.`);
     },
     onError: handleError,
   });
@@ -321,11 +179,15 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
     queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
+    queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
   }
 
   function handleError(err: unknown) {
     const msg = err instanceof Error ? err.message : "Something went wrong";
-    if (msg === "AUTH_EXPIRED") { signOut(); return; }
+    if (msg === "AUTH_EXPIRED") {
+      signOut();
+      return;
+    }
     Alert.alert("Error", msg);
   }
 
@@ -368,7 +230,6 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       return;
     }
 
-    // If user just picked an item, avoid re-searching the same text.
     if (selectedFood && debouncedQuery.trim().toLowerCase() === selectedFood.name.trim().toLowerCase()) {
       setSearching(false);
       return;
@@ -418,12 +279,29 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
   const onAdd = async () => {
     const g = resolvedGrams;
-    if (!selectedFood) { Alert.alert("Select a food", "Search and tap a result first."); return; }
-    if (!Number.isFinite(g) || g <= 0) { Alert.alert("Invalid grams", "Enter a positive number."); return; }
+    if (!selectedFood) {
+      Alert.alert("Select a food", "Search and tap a result first.");
+      return;
+    }
+    if (!Number.isFinite(g) || g <= 0) {
+      Alert.alert("Invalid grams", "Enter a positive number.");
+      return;
+    }
     try {
-      await addMutation.mutateAsync({ foodName: selectedFood.name, foodId: selectedFood.id, grams: g, mealType: meal });
+      await addMutation.mutateAsync({
+        foodName: selectedFood.name,
+        foodId: selectedFood.id,
+        grams: g,
+        mealType: meal,
+      });
       invalidate();
-      setQuery(""); setResults([]); setSelectedFood(null); setSelectedPortionId(null); setPortionAmount("1"); setGrams("100");
+      setQuery("");
+      setResults([]);
+      setSelectedFood(null);
+      setSelectedPortionId(null);
+      setPortionAmount("1");
+      setGrams("100");
+      Alert.alert("Added", `Food added to ${MEAL_LABEL[meal]}.`);
     } catch (err) {
       handleError(err);
     }
@@ -451,64 +329,16 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     setPortionAmount("1");
   };
 
-  const onStartEditLog = (logId: number, currentGrams: number) => {
-    setEditingLogId(logId);
-    setEditingGrams(String(Math.round(currentGrams * 10) / 10));
-  };
-
-  const onCancelEditLog = () => {
-    setEditingLogId(null);
-    setEditingGrams("");
-  };
-
-  const onSaveEditedLog = async () => {
-    if (!editingLog) return;
-    const g = Number(editingGrams);
-    if (!Number.isFinite(g) || g <= 0) {
-      Alert.alert("Invalid grams", "Enter a positive number.");
+  const onAiEstimate = async () => {
+    if (!customName.trim()) {
+      Alert.alert("Enter a food name first.");
       return;
     }
-
     try {
-      await updateMutation.mutateAsync({ logId: editingLog.id, grams: g });
-      invalidate();
-      onCancelEditLog();
-      Alert.alert("Updated", "Food grams updated.");
+      await aiMutation.mutateAsync(customName.trim());
     } catch (err) {
       handleError(err);
     }
-  };
-
-  const onDeleteLog = () => {
-    if (!editingLog) return;
-
-    Alert.alert(
-      "Delete food",
-      `Delete ${editingLog.foodName} from this meal?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteMutation.mutateAsync(editingLog.id);
-              invalidate();
-              onCancelEditLog();
-              Alert.alert("Deleted", "Food removed from this meal.");
-            } catch (err) {
-              handleError(err);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const onAiEstimate = async () => {
-    if (!customName.trim()) { Alert.alert("Enter a food name first."); return; }
-    try { await aiMutation.mutateAsync(customName.trim()); }
-    catch (err) { handleError(err); }
   };
 
   const availablePortionTypes = useMemo(() => {
@@ -548,8 +378,8 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       });
 
       await loadPortionsForFood(selectedFood.id);
-        setSelectedPortionId(created.id);
-        setPortionAmount("1");
+      setSelectedPortionId(created.id);
+      setPortionAmount("1");
       setGrams(String(Math.round(created.grams * 10) / 10));
       setShowAddPortionForm(false);
       setNewPortionTypeCode("");
@@ -562,131 +392,224 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        {/* Header */}
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Text style={s.backIcon}>←</Text>
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>{MEAL_LABEL[meal]} statistics</Text>
+            <Text style={s.headerText}>Search Food</Text>
           </View>
-          <Text style={s.headerDate}>{dayjs(date).format("MMM D")}</Text>
+          <Text style={s.headerDate}>{MEAL_LABEL[meal]}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Meal Statistics</Text>
-            <Text style={s.mealHint}>Consumed / Limit</Text>
-            <View style={s.metricsGrid}>
-              <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Calories</Text>
-                <Text style={[s.metricValue, { color: mealSummaryColors.calories }]}>{Math.round(consumed.calories)} / {Math.round(mealLimits.calories)}</Text>
-              </View>
-              <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Protein</Text>
-                <Text style={[s.metricValue, { color: mealSummaryColors.protein }]}>{Math.round(consumed.protein * 10) / 10}g / {Math.round(mealLimits.protein * 10) / 10}g</Text>
-              </View>
-              <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Carbs</Text>
-                <Text style={[s.metricValue, { color: mealSummaryColors.carbs }]}>{Math.round(consumed.carbs * 10) / 10}g / {Math.round(mealLimits.carbs * 10) / 10}g</Text>
-              </View>
-              <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Fats</Text>
-                <Text style={[s.metricValue, { color: mealSummaryColors.fats }]}>{Math.round(consumed.fats * 10) / 10}g / {Math.round(mealLimits.fats * 10) / 10}g</Text>
-              </View>
-            </View>
+          <View style={s.contextCard}>
+            <Text style={s.contextTitle}>Adding To</Text>
+            <Text style={s.contextText}>{MEAL_LABEL[meal]}</Text>
+            <Text style={s.contextDate}>{date}</Text>
           </View>
 
           <View style={s.card}>
-            <Text style={s.cardTitle}>Add Food</Text>
-            <Pressable
-              onPress={() => navigation.navigate("SearchFood", { meal, date })}
-              style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`Add food for ${MEAL_LABEL[meal]}`}
-            >
-              <Text style={s.addBtnText}>Add Food</Text>
-            </Pressable>
-          </View>
-
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Already Added Foods</Text>
-
-            {logsQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
-
-            {currentMealLogs.length > 0 ? (
-              <View style={s.results}>
-                {currentMealLogs.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => onStartEditLog(item.id, item.grams)}
-                    style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
-                  >
-                    <View style={s.resultTextCol}>
-                      <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
-                      {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
-                    </View>
-                    <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
-                  </Pressable>
-                ))}
+            <Text style={s.cardTitle}>Search Food</Text>
+            {selectedFood ? (
+              <View style={s.selectedChip}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
+                  {selectedFood.brandOrPlace ? (
+                    <Text style={s.selectedChipSubText} numberOfLines={1}>{selectedFood.brandOrPlace}</Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setSelectedFood(null);
+                    setQuery("");
+                    setResults([]);
+                    setSelectedPortionId(null);
+                    setPortionAmount("1");
+                    setPortions([]);
+                    setShowAddPortionForm(false);
+                    setNewPortionTypeCode("");
+                    setNewPortionGrams("100");
+                  }}
+                  style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}
+                  accessibilityLabel="Clear selected food"
+                >
+                  <Text style={s.clearBtnText}>✕</Text>
+                </Pressable>
               </View>
             ) : (
-              <Text style={s.emptyMealText}>No foods added to this meal yet.</Text>
-            )}
+              <>
+                <TextInput
+                  value={query}
+                  onChangeText={onSearch}
+                  placeholder="Type at least 2 characters..."
+                  placeholderTextColor="#9ca3af"
+                  style={s.input}
+                  autoFocus
+                  returnKeyType="search"
+                />
 
-            {editingLog ? (
-              <View style={s.editBox}>
-                <Text style={s.editTitle}>Edit {editingLog.foodName}</Text>
-                <View style={s.row}>
-                  <TextInput
-                    value={editingGrams}
-                    onChangeText={setEditingGrams}
-                    keyboardType="numeric"
-                    placeholder="New grams"
-                    placeholderTextColor="#9ca3af"
-                    style={[s.input, s.gramsInput]}
-                    returnKeyType="done"
-                  />
-                </View>
+                {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
 
-                {editingPreview ? (
-                  <View style={s.previewBox}>
-                    <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
-                    <View style={s.previewRow}>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {editingPreview.calories} kcal</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {editingPreview.protein}g P</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {editingPreview.carbs}g C</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {editingPreview.fats}g F</Text>
-                    </View>
+                {results.length > 0 ? (
+                  <View style={s.results}>
+                    {results.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={async () => {
+                          setSelectedFood(item);
+                          setQuery(item.name);
+                          setResults([]);
+                          setSelectedPortionId(null);
+                          setPortionAmount("1");
+                          setShowAddPortionForm(false);
+                          setNewPortionTypeCode("");
+                          setNewPortionGrams("100");
+                          try {
+                            await loadPortionsForFood(item.id);
+                          } catch (err) {
+                            handleError(err);
+                          }
+                        }}
+                        style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
+                      >
+                        <View style={s.resultTextCol}>
+                          <Text style={s.resultName}>{item.name}</Text>
+                          {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                        </View>
+                        <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
+                      </Pressable>
+                    ))}
                   </View>
                 ) : null}
+              </>
+            )}
 
-                <View style={s.editActions}>
+            {selectedFoodPreview ? (
+              <View style={s.previewBox}>
+                <Text style={s.previewTitle}>
+                  {selectedPortion
+                    ? `Will add (${portionAmount || "0"} x ${selectedPortion.portionName} = ${selectedFoodPreview.grams}g)`
+                    : `Will add (${selectedFoodPreview.grams}g)`}
+                </Text>
+                <View style={s.previewRow}>
+                  <Text style={s.previewItem}>🔥 {selectedFoodPreview.calories} kcal</Text>
+                  <Text style={s.previewItem}>🥩 {selectedFoodPreview.protein}g P</Text>
+                  <Text style={s.previewItem}>🍚 {selectedFoodPreview.carbs}g C</Text>
+                  <Text style={s.previewItem}>🥑 {selectedFoodPreview.fats}g F</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={s.row}>
+              <TextInput
+                value={selectedPortion ? portionAmount : grams}
+                onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
+                keyboardType="numeric"
+                placeholder={selectedPortion ? "Amount" : "Grams"}
+                placeholderTextColor="#9ca3af"
+                style={[s.input, s.gramsInput]}
+                returnKeyType="done"
+              />
+              <Pressable
+                onPress={onAdd}
+                disabled={addMutation.isPending || !selectedFood}
+                style={({ pressed }) => [s.addBtn, (!selectedFood || addMutation.isPending) && s.addBtnDisabled, pressed && s.pressed]}
+              >
+                <Text style={s.addBtnText}>{addMutation.isPending ? "Adding..." : "Add"}</Text>
+              </Pressable>
+            </View>
+
+            {selectedPortion ? (
+              <Text style={s.portionAmountHint}>
+                Qty x {selectedPortion.portionName} = {Math.round(selectedFoodPreview?.grams ?? 0)}g
+              </Text>
+            ) : null}
+
+            {selectedFood && portions.length > 0 ? (
+              <View style={s.portionWrap}>
+                <Text style={s.portionLabel}>Portions for this food</Text>
+                <View style={s.portionRow}>
                   <Pressable
-                    onPress={onDeleteLog}
-                    disabled={deleteMutation.isPending || updateMutation.isPending}
+                    onPress={onSelectGramMode}
                     style={({ pressed }) => [
-                      s.deleteBtn,
-                      (deleteMutation.isPending || updateMutation.isPending) && s.addBtnDisabled,
+                      s.portionChip,
+                      selectedPortionId === null && s.portionChipActive,
                       pressed && s.pressed,
                     ]}
                   >
-                    <Text style={s.deleteBtnText}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</Text>
+                    <Text style={[
+                      s.portionChipText,
+                      selectedPortionId === null && s.portionChipTextActive,
+                    ]}>Grams</Text>
                   </Pressable>
+                  {portions.map((portion) => (
+                    <Pressable
+                      key={portion.id}
+                      onPress={() => onSelectPortion(portion)}
+                      style={({ pressed }) => [
+                        s.portionChip,
+                        selectedPortionId === portion.id && s.portionChipActive,
+                        pressed && s.pressed,
+                      ]}
+                    >
+                      <Text style={[
+                        s.portionChipText,
+                        selectedPortionId === portion.id && s.portionChipTextActive,
+                      ]}>{portion.portionName} ({Math.round(portion.grams)}g)</Text>
+                    </Pressable>
+                  ))}
                   <Pressable
-                    onPress={onCancelEditLog}
-                    style={({ pressed }) => [s.cancelBtn, pressed && s.pressed]}
+                    onPress={() => setShowAddPortionForm((v) => !v)}
+                    style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
                   >
-                    <Text style={s.cancelBtnText}>Cancel</Text>
+                    <Text style={s.portionChipAddText}>+ Add another portion</Text>
                   </Pressable>
-                  <Pressable
-                    onPress={onSaveEditedLog}
-                    disabled={updateMutation.isPending || deleteMutation.isPending}
-                    style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
-                  >
-                    <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
+                </View>
+              </View>
+            ) : selectedFood ? (
+              <View style={s.portionWrap}>
+                <Text style={s.portionLabel}>No saved portions yet</Text>
+                <Pressable
+                  onPress={() => setShowAddPortionForm((v) => !v)}
+                  style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
+                >
+                  <Text style={s.portionChipAddText}>+ Add first portion</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {selectedFood && showAddPortionForm ? (
+              <View style={s.addPortionBox}>
+                <Text style={s.addPortionTitle}>Add portion for {selectedFood.name}</Text>
+                <View style={s.portionRow}>
+                  {availablePortionTypes.map((type) => (
+                    <Pressable
+                      key={type.id}
+                      onPress={() => setNewPortionTypeCode(type.code)}
+                      style={({ pressed }) => [
+                        s.typeChip,
+                        newPortionTypeCode === type.code && s.typeChipActive,
+                        pressed && s.pressed,
+                      ]}
+                    >
+                      <Text style={[s.typeChipText, newPortionTypeCode === type.code && s.typeChipTextActive]}>{type.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={s.row}>
+                  <TextInput
+                    value={newPortionGrams}
+                    onChangeText={setNewPortionGrams}
+                    keyboardType="numeric"
+                    placeholder="Grams"
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.gramsInput]}
+                  />
+                  <Pressable onPress={onCreatePortionForFood} style={({ pressed }) => [s.addBtn, pressed && s.pressed]}>
+                    <Text style={s.addBtnText}>Save portion</Text>
                   </Pressable>
                 </View>
               </View>
@@ -694,14 +617,61 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           </View>
 
           <Pressable
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Done with meal statistics"
-            style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
+            onPress={() => setShowCustom((v) => !v)}
+            style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Done</Text>
+            <Text style={s.customToggleText}>{showCustom ? "▲ Hide Create New Food" : "▼ Create New Food"}</Text>
           </Pressable>
 
+          {showCustom ? (
+            <View style={s.card}>
+              <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
+              <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set log grams for what you ate now.</Text>
+
+              <TextInput value={customName} onChangeText={setCustomName} placeholder="Food name" placeholderTextColor="#9ca3af" style={s.input} />
+              <TextInput value={customBrandOrPlace} onChangeText={setCustomBrandOrPlace} placeholder="Brand or place" placeholderTextColor="#9ca3af" style={s.input} />
+
+              <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
+                <Text style={s.aiBtnText}>{aiMutation.isPending ? "Estimating..." : "AI Estimate"}</Text>
+              </Pressable>
+              {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
+
+              <TextInput value={customCalories} onChangeText={setCustomCalories} keyboardType="numeric" placeholder="Calories / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <TextInput value={customProtein} onChangeText={setCustomProtein} keyboardType="numeric" placeholder="Protein g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <TextInput value={customCarbs} onChangeText={setCustomCarbs} keyboardType="numeric" placeholder="Carbs g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <TextInput value={customFats} onChangeText={setCustomFats} keyboardType="numeric" placeholder="Fats g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
+              <TextInput value={customGrams} onChangeText={setCustomGrams} keyboardType="numeric" placeholder="Log grams" placeholderTextColor="#9ca3af" style={s.input} />
+
+              {customFoodPreview ? (
+                <View style={s.previewBox}>
+                  <Text style={s.previewTitle}>Will be logged ({customFoodPreview.grams}g)</Text>
+                  <View style={s.previewRow}>
+                    <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
+                    <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
+                    <Text style={s.previewItem}>🍚 {customFoodPreview.carbs}g C</Text>
+                    <Text style={s.previewItem}>🥑 {customFoodPreview.fats}g F</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <Pressable
+                onPress={() => createCustomMutation.mutate()}
+                disabled={createCustomMutation.isPending}
+                style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
+              >
+                <Text style={s.addBtnText}>{createCustomMutation.isPending ? "Saving..." : "Create & Log"}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to meal statistics"
+            style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
+          >
+            <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -722,7 +692,8 @@ const s = StyleSheet.create({
     gap: 10,
   },
   backBtn: {
-    width: 36, height: 36,
+    width: 36,
+    height: 36,
     borderRadius: 18,
     backgroundColor: "#f3f4f6",
     alignItems: "center",
@@ -732,9 +703,21 @@ const s = StyleSheet.create({
   headerTitle: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   headerIcon: { fontSize: 20 },
   headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  headerDate: { fontSize: 12, color: "#9ca3af", fontWeight: "600" },
+  headerDate: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
 
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
+
+  contextCard: {
+    backgroundColor: "#ecfdf5",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    gap: 2,
+  },
+  contextTitle: { fontSize: 11, color: "#047857", textTransform: "uppercase", fontWeight: "700" },
+  contextText: { fontSize: 16, color: "#064e3b", fontWeight: "700" },
+  contextDate: { fontSize: 12, color: "#065f46" },
 
   card: {
     backgroundColor: "#fff",
@@ -743,11 +726,6 @@ const s = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   cardTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 },
 
@@ -762,7 +740,6 @@ const s = StyleSheet.create({
     backgroundColor: "#f9fafb",
   },
   helperText: { fontSize: 12, color: "#6b7280", lineHeight: 17 },
-  fieldHelp: { fontSize: 11, color: "#9ca3af", marginBottom: -4 },
 
   results: {
     borderWidth: 1,
@@ -770,24 +747,6 @@ const s = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
   },
-  mealHint: { fontSize: 12, color: "#6b7280", marginTop: -2 },
-  metricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  metricBoxCompact: {
-    width: "48%",
-    borderWidth: 1,
-    borderColor: "#dcfce7",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-  },
-  metricLabel: { fontSize: 11, color: "#166534", fontWeight: "700", textTransform: "uppercase" },
-  metricValue: { fontSize: 12, color: "#111827", fontWeight: "600" },
-  emptyMealText: { fontSize: 12, color: "#9ca3af", fontStyle: "italic" },
   previewBox: {
     borderWidth: 1,
     borderColor: "#bbf7d0",
@@ -925,40 +884,6 @@ const s = StyleSheet.create({
   },
   aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
   aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
-
-  editBox: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  editTitle: { fontSize: 13, fontWeight: "700", color: "#166534" },
-  editActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8 },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 80,
-    alignItems: "center",
-  },
-  cancelBtnText: { fontSize: 14, fontWeight: "700", color: "#374151" },
-  deleteBtn: {
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fef2f2",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 80,
-    alignItems: "center",
-  },
-  deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#b91c1c" },
 
   doneBtn: {
     backgroundColor: "#111827",
