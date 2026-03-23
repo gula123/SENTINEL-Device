@@ -138,8 +138,33 @@ export default function WeightDiaryScreen() {
       .slice(-24);
   }, [historyQuery.data, latestKnownWeight]);
 
-  const chartMetrics = useMemo(() => {
+  const monthlyChartData = useMemo(() => {
     if (chartData.length === 0) {
+      return [] as Array<{ key: string; date: string; monthLabel: string; weight: number }>;
+    }
+
+    const monthLastPoint = new Map<string, { date: string; weight: number }>();
+    chartData.forEach((point) => {
+      const monthKey = dayjs(point.date).format("YYYY-MM");
+      const existing = monthLastPoint.get(monthKey);
+      if (!existing || dayjs(point.date).isAfter(existing.date)) {
+        monthLastPoint.set(monthKey, { date: point.date, weight: point.weight });
+      }
+    });
+
+    return Array.from(monthLastPoint.entries())
+      .map(([monthKey, value]) => ({
+        key: monthKey,
+        date: value.date,
+        monthLabel: dayjs(`${monthKey}-01`).format("MMM"),
+        weight: value.weight,
+      }))
+      .sort((a, b) => dayjs(a.key).diff(dayjs(b.key)))
+      .slice(-12);
+  }, [chartData]);
+
+  const chartMetrics = useMemo(() => {
+    if (monthlyChartData.length === 0) {
       return {
         min: 0,
         max: 0,
@@ -151,7 +176,7 @@ export default function WeightDiaryScreen() {
       };
     }
 
-    const weights = chartData.map((point) => point.weight);
+    const weights = monthlyChartData.map((point) => point.weight);
     const min = Math.min(...weights);
     const max = Math.max(...weights);
     const weightRange = max - min;
@@ -165,8 +190,10 @@ export default function WeightDiaryScreen() {
       tickInterval = 1;
     }
 
-    const yMin = min - 5;
-    const yMax = Math.max(min + 5, max + 5);
+    // Keep visible headroom/footroom so the line never hugs chart bounds.
+    const axisPadding = Math.max(5, weightRange * 0.35);
+    const yMin = min - axisPadding;
+    const yMax = Math.max(min + axisPadding, max + axisPadding);
     const axisMin = Math.floor(yMin / tickInterval) * tickInterval;
     const axisMax = Math.ceil(yMax / tickInterval) * tickInterval;
     const axisSpan = axisMax - axisMin;
@@ -180,38 +207,27 @@ export default function WeightDiaryScreen() {
     const labelStep = axisSpan / segments;
 
     return { min, max, axisMin, axisMax, tickInterval, segments, labelStep };
-  }, [chartData]);
+  }, [monthlyChartData]);
 
   const chartWidth = Math.max(280, windowWidth - 68);
   const chartLabels = useMemo(() => {
-    if (chartData.length === 0) return [] as string[];
-    return chartData.map((point, index) => {
-      if (index === 0) return dayjs(point.date).format("MMM D");
-      if (index === chartData.length - 1) return dayjs(point.date).format("MMM D");
-      return "";
-    });
-  }, [chartData]);
+    if (monthlyChartData.length === 0) return [] as string[];
+    return monthlyChartData.map((point) => point.monthLabel);
+  }, [monthlyChartData]);
 
   const chartDataset = useMemo(() => {
-    const raw = chartData.map((point) => Number(point.weight.toFixed(2)));
-    if (raw.length <= 3) {
-      return raw;
-    }
+    return monthlyChartData.map((point) => Number(point.weight.toFixed(2)));
+  }, [monthlyChartData]);
 
-    // Two-pass weighted moving average for smoother trend without bezier overshoot artifacts.
-    const smoothOnce = (data: number[]) =>
-      data.map((value, index) => {
-        if (index === 0 || index === data.length - 1) {
-          return value;
-        }
+  const axisFloorDataset = useMemo(() => {
+    if (monthlyChartData.length === 0) return [] as number[];
+    return [chartMetrics.axisMin];
+  }, [monthlyChartData.length, chartMetrics.axisMin]);
 
-        const prev = data[index - 1];
-        const next = data[index + 1];
-        return Number(((prev * 0.25) + (value * 0.5) + (next * 0.25)).toFixed(2));
-      });
-
-    return smoothOnce(smoothOnce(raw));
-  }, [chartData]);
+  const axisCeilDataset = useMemo(() => {
+    if (monthlyChartData.length === 0) return [] as number[];
+    return [chartMetrics.axisMax];
+  }, [monthlyChartData.length, chartMetrics.axisMax]);
 
   const stats = statsQuery.data;
 
@@ -230,36 +246,38 @@ export default function WeightDiaryScreen() {
           </View>
         ) : null}
 
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Weight Progress</Text>
+        <View style={s.chartCard}>
+          <Text style={s.chartTitle}>Weight Progress</Text>
           {historyQuery.isLoading ? (
             <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 8 }} />
-          ) : chartData.length === 0 ? (
+          ) : monthlyChartData.length === 0 ? (
             <Text style={s.muted}>No weight data yet.</Text>
           ) : (
             <>
-              <Text style={s.chartSub}>Last 24 entries</Text>
+              <Text style={s.chartSub}>Last 12 months (month-end value)</Text>
               <View style={s.chartBox}>
                 <LineChart
                   data={{
                     labels: chartLabels,
                     datasets: [
-                      { data: chartDataset, strokeWidth: 2.8, color: () => "#16a34a" },
+                      { data: chartDataset, strokeWidth: 2.5, color: () => "#16a34a" },
+                      // Single-point anchors force y-domain min/max without NaN rendering issues.
+                      { data: axisFloorDataset, strokeWidth: 0, color: () => "rgba(0,0,0,0)" },
+                      { data: axisCeilDataset, strokeWidth: 0, color: () => "rgba(0,0,0,0)" },
                     ],
                   }}
                   width={chartWidth}
                   height={220}
                   fromNumber={chartMetrics.axisMin}
-                  withShadow={false}
+                  withShadow
                   withInnerLines
-                  withOuterLines={false}
+                  withOuterLines
                   withVerticalLines={false}
                   withHorizontalLabels
                   withVerticalLabels
                   withDots={false}
-                  yLabelsOffset={4}
-                  xLabelsOffset={4}
-                  segments={Math.max(4, chartMetrics.segments)}
+                  segments={5}
+                  yAxisSuffix="kg"
                   formatYLabel={(value) => {
                     const numeric = Number(value);
                     if (!Number.isFinite(numeric)) {
@@ -271,14 +289,9 @@ export default function WeightDiaryScreen() {
                     backgroundColor: "#f8fafc",
                     backgroundGradientFrom: "#f8fafc",
                     backgroundGradientTo: "#f8fafc",
-                    decimalPlaces: 1,
+                    decimalPlaces: 0,
                     color: () => "#111827",
                     labelColor: () => "#4b5563",
-                    propsForDots: {
-                      r: "2",
-                      strokeWidth: "0",
-                      fill: "#16a34a",
-                    },
                     propsForBackgroundLines: {
                       stroke: "#e2e8f0",
                       strokeWidth: 1,
@@ -386,21 +399,30 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   cardTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 },
-  chartSub: { marginTop: -2, fontSize: 12, color: "#6b7280" },
+  chartCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 12,
+    gap: 8,
+  },
+  chartTitle: { fontSize: 15, fontWeight: "800", color: "#111827" },
+  chartSub: { fontSize: 12, color: "#6b7280" },
   muted: { fontSize: 12, color: "#6b7280" },
 
   chartBox: {
     minHeight: 220,
     position: "relative",
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     backgroundColor: "#f8fafc",
     overflow: "hidden",
   },
   chart: {
-    borderRadius: 12,
-    alignSelf: "center",
+    borderRadius: 10,
+    marginLeft: -16,
   },
 
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
