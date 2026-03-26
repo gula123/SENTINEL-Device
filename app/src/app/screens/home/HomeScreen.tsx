@@ -256,23 +256,25 @@ function DayView({
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => setShowFillOptions((v) => !v)}
-          disabled={isVacationDay || quickFillMutation.isPending}
-          style={({ pressed }) => [
-            styles.quickFillTrigger,
-            showFillOptions && styles.quickFillTriggerActive,
-            (isVacationDay || quickFillMutation.isPending) && styles.disabledChip,
-            pressed && styles.buttonPressed,
-          ]}
-        >
-          <Text style={[styles.quickFillTriggerText, showFillOptions && styles.quickFillTriggerTextActive]}>
-            {quickFillMutation.isPending ? "⏳" : "⚡"} Quick Fill
-          </Text>
-        </Pressable>
+        {!isVacationDay ? (
+          <Pressable
+            onPress={() => setShowFillOptions((v) => !v)}
+            disabled={quickFillMutation.isPending}
+            style={({ pressed }) => [
+              styles.quickFillTrigger,
+              showFillOptions && styles.quickFillTriggerActive,
+              quickFillMutation.isPending && styles.disabledChip,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={[styles.quickFillTriggerText, showFillOptions && styles.quickFillTriggerTextActive]}>
+              {quickFillMutation.isPending ? "⏳" : "⚡"} Quick Fill
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {showFillOptions ? (
+      {!isVacationDay && showFillOptions ? (
         <View style={styles.fillOptionsRow}>
           <Text style={styles.fillOptionsLabel}>Fill to</Text>
           {QUICK_FILL_LEVELS.map((level) => (
@@ -318,7 +320,15 @@ function DayView({
         </View>
       ) : null}
 
-      {summary ? (
+      {!diaryDayQuery.isLoading && !diaryDayQuery.isError && isVacationDay ? (
+        <View style={styles.vacationHero}>
+          <Text style={styles.vacationHeroIcon}>🏝️</Text>
+          <Text style={styles.vacationHeroTitle}>Vacation Day</Text>
+          <Text style={styles.vacationHeroText}>Relax and recharge. Food logging is paused for this day.</Text>
+        </View>
+      ) : null}
+
+      {!isVacationDay && summary ? (
         <>
           <View style={styles.calorieCard}>
             <Text style={styles.calorieLabel}>Daily Calories</Text>
@@ -346,25 +356,29 @@ function DayView({
         </>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Meals</Text>
-      {diaryDayQuery.isLoading ? (
-        <ActivityIndicator size="small" color="#16a34a" />
-      ) : (
-        MEAL_ORDER.map((meal) => (
-          <MealSummaryCard
-            key={meal}
-            meal={meal}
-            items={grouped[meal]}
-            limits={summary ? {
-              proteinLimit: dayLimits.mealMacros[meal].protein,
-              carbsLimit: dayLimits.mealMacros[meal].carbs,
-              fatsLimit: dayLimits.mealMacros[meal].fats,
-            } : null}
-            calLimit={dayLimits.mealCalories[meal]}
-            onLogPress={() => navigation.navigate("LogFood", { meal, date })}
-          />
-        ))
-      )}
+      {!isVacationDay ? (
+        <>
+          <Text style={styles.sectionTitle}>Meals</Text>
+          {diaryDayQuery.isLoading ? (
+            <ActivityIndicator size="small" color="#16a34a" />
+          ) : (
+            MEAL_ORDER.map((meal) => (
+              <MealSummaryCard
+                key={meal}
+                meal={meal}
+                items={grouped[meal]}
+                limits={summary ? {
+                  proteinLimit: dayLimits.mealMacros[meal].protein,
+                  carbsLimit: dayLimits.mealMacros[meal].carbs,
+                  fatsLimit: dayLimits.mealMacros[meal].fats,
+                } : null}
+                calLimit={dayLimits.mealCalories[meal]}
+                onLogPress={() => navigation.navigate("LogFood", { meal, date })}
+              />
+            ))
+          )}
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -572,6 +586,33 @@ const styles = StyleSheet.create({
   },
   disabledChip: { opacity: 0.4 },
   quickFillChipText: { fontSize: 12, fontWeight: "700", color: "#166534" },
+
+  vacationHero: {
+    minHeight: 320,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#fcd34d",
+    backgroundColor: "#fff7ed",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    gap: 10,
+    shadowColor: "#f59e0b",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  vacationHeroIcon: { fontSize: 84 },
+  vacationHeroTitle: { fontSize: 30, fontWeight: "800", color: "#9a3412" },
+  vacationHeroText: {
+    textAlign: "center",
+    fontSize: 16,
+    lineHeight: 22,
+    color: "#7c2d12",
+    maxWidth: 340,
+  },
 
   // Calorie card
   calorieCard: {
