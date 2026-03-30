@@ -745,6 +745,9 @@ export default function LogFoodScreen({ route, navigation }: Props) {
             )}
           </View>
 
+        </ScrollView>
+
+        <View style={s.footer}>
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
@@ -753,8 +756,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           >
             <Text style={s.doneBtnText}>Done</Text>
           </Pressable>
-
-        </ScrollView>
+        </View>
 
         {toastMessage ? (
           <Animated.View
@@ -808,7 +810,7 @@ const s = StyleSheet.create({
   headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
   headerDate: { fontSize: 12, color: "#9ca3af", fontWeight: "600" },
 
-  scroll: { padding: 16, gap: 12, paddingBottom: 40 },
+  scroll: { padding: 16, gap: 12, paddingBottom: 120 },
 
   card: {
     backgroundColor: "#fff",
@@ -1034,12 +1036,23 @@ const s = StyleSheet.create({
   },
   deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#b91c1c" },
 
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: "#f8fdfb",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
   doneBtn: {
     backgroundColor: "#111827",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
-    marginTop: 4,
   },
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 

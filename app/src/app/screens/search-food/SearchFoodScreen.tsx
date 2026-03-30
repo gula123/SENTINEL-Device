@@ -544,15 +544,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
               </View>
               ) : null}
             </View>
-
-          <Pressable
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back to add food"
-            style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
-          >
-            <Text style={s.doneBtnText}>Back to Add Food</Text>
-          </Pressable>
         </ScrollView>
 
         {toastMessage ? (
@@ -577,6 +568,17 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
           </Animated.View>
         ) : null}
       </KeyboardAvoidingView>
+
+      <View style={s.footer}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Back to add food"
+          style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
+        >
+          <Text style={s.doneBtnText}>Back to Add Food</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -758,6 +760,14 @@ const s = StyleSheet.create({
   addBtnDisabled: { backgroundColor: "#d1d5db" },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: "#f8fdfb",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
   doneBtn: {
     backgroundColor: "#111827",
     borderRadius: 12,
