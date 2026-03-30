@@ -6,14 +6,20 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from "react-native";
+
+if (Platform.OS === "android") {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
@@ -480,11 +486,13 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   };
 
   const onStartEditLog = (logId: number, currentGrams: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditingLogId(logId);
     setEditingGrams(String(Math.round(currentGrams * 10) / 10));
   };
 
   const onCancelEditLog = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditingLogId(null);
     setEditingGrams("");
   };
@@ -657,79 +665,84 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
             {currentMealLogs.length > 0 ? (
               <View style={s.results}>
-                {currentMealLogs.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => onStartEditLog(item.id, item.grams)}
-                    style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
-                  >
-                    <View style={s.resultTextCol}>
-                      <Text style={s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
-                      {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                {currentMealLogs.map((item, index) => {
+                  const isEditing = editingLogId === item.id;
+                  const isLast = index === currentMealLogs.length - 1;
+
+                  return (
+                    <View key={item.id} style={[isEditing ? s.foodEntryExpanded : s.foodEntry, !isLast && !isEditing && s.foodEntryBorder]}>
+                      <Pressable
+                        onPress={() => onStartEditLog(item.id, item.grams)}
+                        style={({ pressed }) => [s.resultRow, isEditing && { backgroundColor: "transparent" }, !isEditing && pressed && s.pressed]}
+                      >
+                        <View style={s.resultTextCol}>
+                          <Text style={isEditing ? [s.resultName, s.resultNameExpanded] : s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
+                          {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                        </View>
+                        <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
+                      </Pressable>
+
+                      {isEditing ? (
+                        <View style={s.expandContent}>
+                          <View style={s.row}>
+                            <TextInput
+                              value={editingGrams}
+                              onChangeText={setEditingGrams}
+                              keyboardType="numeric"
+                              placeholder="New grams"
+                              placeholderTextColor="#9ca3af"
+                              style={[s.input, s.gramsInput]}
+                              returnKeyType="done"
+                            />
+                          </View>
+
+                          {editingPreview ? (
+                            <View style={s.previewBox}>
+                              <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
+                              <View style={s.previewRow}>
+                                <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {editingPreview.calories} kcal</Text>
+                                <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {editingPreview.protein}g P</Text>
+                                <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {editingPreview.carbs}g C</Text>
+                                <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {editingPreview.fats}g F</Text>
+                              </View>
+                            </View>
+                          ) : null}
+
+                          <View style={s.editActions}>
+                            <Pressable
+                              onPress={onDeleteLog}
+                              disabled={deleteMutation.isPending || updateMutation.isPending}
+                              style={({ pressed }) => [
+                                s.deleteBtn,
+                                (deleteMutation.isPending || updateMutation.isPending) && s.addBtnDisabled,
+                                pressed && s.pressed,
+                              ]}
+                            >
+                              <Text style={s.deleteBtnText}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={onCancelEditLog}
+                              style={({ pressed }) => [s.cancelBtn, pressed && s.pressed]}
+                            >
+                              <Text style={s.cancelBtnText}>Cancel</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={onSaveEditedLog}
+                              disabled={updateMutation.isPending || deleteMutation.isPending}
+                              style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
+                            >
+                              <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      ) : null}
                     </View>
-                    <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
-                  </Pressable>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <Text style={s.emptyMealText}>No foods added to this meal yet.</Text>
             )}
-
-            {editingLog ? (
-              <View style={s.editBox}>
-                <Text style={s.editTitle}>Edit {editingLog.foodName}</Text>
-                <View style={s.row}>
-                  <TextInput
-                    value={editingGrams}
-                    onChangeText={setEditingGrams}
-                    keyboardType="numeric"
-                    placeholder="New grams"
-                    placeholderTextColor="#9ca3af"
-                    style={[s.input, s.gramsInput]}
-                    returnKeyType="done"
-                  />
-                </View>
-
-                {editingPreview ? (
-                  <View style={s.previewBox}>
-                    <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
-                    <View style={s.previewRow}>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {editingPreview.calories} kcal</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {editingPreview.protein}g P</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.carbs ?? "#374151" }]}>🍚 {editingPreview.carbs}g C</Text>
-                      <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.fats ?? "#374151" }]}>🥑 {editingPreview.fats}g F</Text>
-                    </View>
-                  </View>
-                ) : null}
-
-                <View style={s.editActions}>
-                  <Pressable
-                    onPress={onDeleteLog}
-                    disabled={deleteMutation.isPending || updateMutation.isPending}
-                    style={({ pressed }) => [
-                      s.deleteBtn,
-                      (deleteMutation.isPending || updateMutation.isPending) && s.addBtnDisabled,
-                      pressed && s.pressed,
-                    ]}
-                  >
-                    <Text style={s.deleteBtnText}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={onCancelEditLog}
-                    style={({ pressed }) => [s.cancelBtn, pressed && s.pressed]}
-                  >
-                    <Text style={s.cancelBtnText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={onSaveEditedLog}
-                    disabled={updateMutation.isPending || deleteMutation.isPending}
-                    style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
-                  >
-                    <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
           </View>
 
           <Pressable
@@ -866,14 +879,24 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     backgroundColor: "#fff",
   },
   resultTextCol: { flex: 1, marginRight: 8 },
   resultName: { fontSize: 13, color: "#111827" },
+  resultNameExpanded: { color: "#166534", fontWeight: "600" },
   resultSubmeta: { fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: "500" },
   resultMeta: { fontSize: 12, color: "#9ca3af" },
+
+  foodEntry: { backgroundColor: "#fff" },
+  foodEntryExpanded: { backgroundColor: "#f0fdf4" },
+  foodEntryBorder: { borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  pressed: { backgroundColor: "#f3f4f6" },
+
+  expandContent: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    gap: 8,
+  },
 
   selectedChip: {
     flexDirection: "row",
@@ -987,16 +1010,6 @@ const s = StyleSheet.create({
   aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
   aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
 
-  editBox: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  editTitle: { fontSize: 13, fontWeight: "700", color: "#166534" },
   editActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8 },
   cancelBtn: {
     borderWidth: 1,
@@ -1029,8 +1042,6 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-
-  pressed: { opacity: 0.65 },
 
   toast: {
     position: "absolute",
