@@ -16,7 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "hu.gurul.sentinel.health",
+      "package": "hu.gurul.health.app",
       "intentFilters": [
         {
           "action": "VIEW",
