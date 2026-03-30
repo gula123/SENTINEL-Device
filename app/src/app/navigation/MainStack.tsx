@@ -1,7 +1,9 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabs from "./MainTabs";
 import LogFoodScreen from "../screens/log-food/LogFoodScreen";
+import AddFoodScreen from "../screens/add-food/AddFoodScreen";
 import SearchFoodScreen from "../screens/search-food/SearchFoodScreen";
+import CreateFoodScreen from "../screens/create-food/CreateFoodScreen";
 import HabitInsightsScreen from "../screens/habits/HabitInsightsScreen";
 import type { MainStackParamList } from "./navigationTypes";
 
@@ -22,6 +24,16 @@ export default function MainStack() {
       <Stack.Screen
         name="SearchFood"
         component={SearchFoodScreen}
+        options={{ presentation: "modal", headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddFood"
+        component={AddFoodScreen}
+        options={{ presentation: "modal", headerShown: false }}
+      />
+      <Stack.Screen
+        name="CreateFood"
+        component={CreateFoodScreen}
         options={{ presentation: "modal", headerShown: false }}
       />
     </Stack.Navigator>

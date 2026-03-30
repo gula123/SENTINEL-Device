@@ -19,14 +19,11 @@ import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import {
   createFoodPortion,
-  createCustomFood,
-  estimateFoodPer100gWithAi,
   fetchFoodPortions,
   fetchPortionTypes,
   type PortionDto,
   type PortionTypeDto,
   searchFoods,
-  type AiFoodEstimate,
   type FoodItem,
   type MealType,
 } from "../../services/food/foodLogsApi";
@@ -63,16 +60,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const [newPortionGrams, setNewPortionGrams] = useState("100");
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
-
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [customName, setCustomName] = useState("");
-  const [customBrandOrPlace, setCustomBrandOrPlace] = useState("");
-  const [customCalories, setCustomCalories] = useState("0");
-  const [customProtein, setCustomProtein] = useState("0");
-  const [customCarbs, setCustomCarbs] = useState("0");
-  const [customFats, setCustomFats] = useState("0");
-  const [customGrams, setCustomGrams] = useState("100");
-  const [aiNote, setAiNote] = useState("");
 
   const { token, signOut } = useAuth();
   const queryClient = useQueryClient();
@@ -122,82 +109,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     };
   }, [selectedFood, resolvedGrams]);
 
-  const customFoodPreview = useMemo(() => {
-    const parsedGrams = Number(customGrams);
-    const g = Number.isFinite(parsedGrams) && parsedGrams > 0 ? parsedGrams : 0;
-    const factor = g / 100;
-    const calories = Number(customCalories) || 0;
-    const protein = Number(customProtein) || 0;
-    const carbs = Number(customCarbs) || 0;
-    const fats = Number(customFats) || 0;
-
-    return {
-      grams: g,
-      calories: Math.round(calories * factor),
-      protein: Math.round(protein * factor * 10) / 10,
-      carbs: Math.round(carbs * factor * 10) / 10,
-      fats: Math.round(fats * factor * 10) / 10,
-    };
-  }, [customCalories, customProtein, customCarbs, customFats, customGrams]);
-
-  const aiMutation = useMutation({
-    mutationFn: async (name: string): Promise<AiFoodEstimate> => {
-      if (!token) throw new Error("AUTH_REQUIRED");
-      return estimateFoodPer100gWithAi(token, name, customBrandOrPlace.trim() || undefined);
-    },
-    onSuccess: (e) => {
-      setCustomCalories(String(Math.round(e.caloriesPer100g)));
-      setCustomProtein(String(Math.round(e.proteinPer100g * 10) / 10));
-      setCustomCarbs(String(Math.round(e.carbsPer100g * 10) / 10));
-      setCustomFats(String(Math.round(e.fatsPer100g * 10) / 10));
-      setAiNote(e.assumption || "AI estimated typical nutrition for this food.");
-    },
-  });
-
-  const createCustomMutation = useMutation({
-    mutationFn: async () => {
-      if (!token) throw new Error("AUTH_REQUIRED");
-      if (!customName.trim()) throw new Error("Enter a food name");
-      const g = Number(customGrams);
-      if (!Number.isFinite(g) || g <= 0) throw new Error("Enter valid grams");
-
-      const created = await createCustomFood(token, {
-        name: customName.trim(),
-        brandOrPlace: customBrandOrPlace.trim() || undefined,
-        caloriesPer100g: Number(customCalories) || 0,
-        proteinPer100g: Number(customProtein) || 0,
-        carbsPer100g: Number(customCarbs) || 0,
-        fatsPer100g: Number(customFats) || 0,
-      });
-
-      await addMutation.mutateAsync({
-        foodName: created.name,
-        foodId: created.id,
-        grams: g,
-        mealType: meal,
-      });
-    },
-    onSuccess: () => {
-      setCustomName("");
-      setCustomCalories("0");
-      setCustomProtein("0");
-      setCustomCarbs("0");
-      setCustomFats("0");
-      setCustomGrams("100");
-      setCustomBrandOrPlace("");
-      setAiNote("");
-      invalidate();
-      showToast(`${MEAL_LABEL[meal]}: food created and logged`);
-    },
-    onError: handleError,
-  });
-
-  function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
-    queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
-    queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
-  }
-
   function handleError(err: unknown) {
     const msg = err instanceof Error ? err.message : "Something went wrong";
     if (msg === "AUTH_EXPIRED") {
@@ -205,6 +116,12 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       return;
     }
     Alert.alert("Error", msg);
+  }
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
+    queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
+    queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
   }
 
   useEffect(() => {
@@ -422,15 +339,8 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <View style={s.contextCard}>
-            <Text style={s.contextTitle}>Adding To</Text>
-            <Text style={s.contextText}>{MEAL_LABEL[meal]}</Text>
-            <Text style={s.contextDate}>{date}</Text>
-          </View>
-
-          {!isCreateMode ? (
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Search Food</Text>
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Search Food</Text>
               {selectedFood ? (
               <View style={s.selectedChip}>
                 <View style={{ flex: 1 }}>
@@ -633,71 +543,15 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 </View>
               </View>
               ) : null}
-
-              <Pressable
-                onPress={() => setIsCreateMode(true)}
-                style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
-              >
-                <Text style={s.customToggleText}>▼ Create New Food</Text>
-              </Pressable>
             </View>
-          ) : (
-            <>
-              <Pressable
-                onPress={() => setIsCreateMode(false)}
-                style={({ pressed }) => [s.customToggle, pressed && s.pressed]}
-              >
-                <Text style={s.customToggleText}>← Back to Search Food</Text>
-              </Pressable>
-
-            <View style={s.card}>
-              <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
-              <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set log grams for what you ate now.</Text>
-
-              <TextInput value={customName} onChangeText={setCustomName} placeholder="Food name" placeholderTextColor="#9ca3af" style={s.input} />
-              <TextInput value={customBrandOrPlace} onChangeText={setCustomBrandOrPlace} placeholder="Brand or place" placeholderTextColor="#9ca3af" style={s.input} />
-
-              <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
-                <Text style={s.aiBtnText}>{aiMutation.isPending ? "Estimating..." : "AI Estimate"}</Text>
-              </Pressable>
-              {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
-
-              <TextInput value={customCalories} onChangeText={setCustomCalories} keyboardType="numeric" placeholder="Calories / 100g" placeholderTextColor="#9ca3af" style={s.input} />
-              <TextInput value={customProtein} onChangeText={setCustomProtein} keyboardType="numeric" placeholder="Protein g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
-              <TextInput value={customCarbs} onChangeText={setCustomCarbs} keyboardType="numeric" placeholder="Carbs g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
-              <TextInput value={customFats} onChangeText={setCustomFats} keyboardType="numeric" placeholder="Fats g / 100g" placeholderTextColor="#9ca3af" style={s.input} />
-              <TextInput value={customGrams} onChangeText={setCustomGrams} keyboardType="numeric" placeholder="Log grams" placeholderTextColor="#9ca3af" style={s.input} />
-
-              {customFoodPreview ? (
-                <View style={s.previewBox}>
-                  <Text style={s.previewTitle}>Will be logged ({customFoodPreview.grams}g)</Text>
-                  <View style={s.previewRow}>
-                    <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
-                    <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
-                    <Text style={s.previewItem}>🍚 {customFoodPreview.carbs}g C</Text>
-                    <Text style={s.previewItem}>🥑 {customFoodPreview.fats}g F</Text>
-                  </View>
-                </View>
-              ) : null}
-
-              <Pressable
-                onPress={() => createCustomMutation.mutate()}
-                disabled={createCustomMutation.isPending}
-                style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
-              >
-                <Text style={s.addBtnText}>{createCustomMutation.isPending ? "Saving..." : "Create & Log"}</Text>
-              </Pressable>
-            </View>
-            </>
-          )}
 
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Back to meal statistics"
+            accessibilityLabel="Back to add food"
             style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
+            <Text style={s.doneBtnText}>Back to Add Food</Text>
           </Pressable>
         </ScrollView>
 
@@ -755,18 +609,6 @@ const s = StyleSheet.create({
   headerDate: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
 
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
-
-  contextCard: {
-    backgroundColor: "#ecfdf5",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
-    gap: 2,
-  },
-  contextTitle: { fontSize: 11, color: "#047857", textTransform: "uppercase", fontWeight: "700" },
-  contextText: { fontSize: 16, color: "#064e3b", fontWeight: "700" },
-  contextDate: { fontSize: 12, color: "#065f46" },
 
   card: {
     backgroundColor: "#fff",
@@ -915,24 +757,6 @@ const s = StyleSheet.create({
   },
   addBtnDisabled: { backgroundColor: "#d1d5db" },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-
-  customToggle: {
-    alignSelf: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  customToggleText: { fontSize: 13, color: "#6b7280", fontWeight: "600" },
-
-  aiBtn: {
-    backgroundColor: "#f0fdf4",
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    borderRadius: 10,
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
-  aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
 
   doneBtn: {
     backgroundColor: "#111827",

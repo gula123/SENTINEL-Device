@@ -641,7 +641,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           <View style={s.card}>
             <Text style={s.cardTitle}>Add Food</Text>
             <Pressable
-              onPress={() => navigation.navigate("SearchFood", { meal, date })}
+              onPress={() => navigation.navigate("AddFood", { meal, date })}
               style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
               accessibilityRole="button"
               accessibilityLabel={`Add food for ${MEAL_LABEL[meal]}`}

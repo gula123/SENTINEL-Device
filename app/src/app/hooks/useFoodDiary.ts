@@ -47,6 +47,7 @@ export const useAddFoodLog = (date: string) => {
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] }),
         queryClient.invalidateQueries({ queryKey: ["diaryDay", date] }),
         queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
+        queryClient.invalidateQueries({ queryKey: ["frequentFoods"] }),
       ]);
     },
   });

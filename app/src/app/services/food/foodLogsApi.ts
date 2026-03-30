@@ -247,3 +247,28 @@ export const createFoodPortion = async (
 
   return response.json();
 };
+
+export const fetchFrequentFoods = async (token: string, limit: number = 10): Promise<FoodItem[]> => {
+  const response = await authenticatedFetch(`/food/frequent?limit=${limit}`, token, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to fetch frequent foods (${response.status})`);
+  }
+
+  const items: BackendFoodItem[] = await response.json();
+  return items
+    .filter((item) => !item.name.toLowerCase().startsWith("quick fill "))
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      brandOrPlace: item.brandOrPlace || undefined,
+      calories: item.caloriesPer100g,
+      protein: item.proteinPer100g,
+      carbs: item.carbsPer100g,
+      fats: item.fatsPer100g,
+      source: item.source,
+    }));
+};
