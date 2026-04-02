@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from "react-native";
+import { ActivityIndicator, FlatList, LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from "react-native";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -29,6 +29,9 @@ const s = StyleSheet.create({
     borderColor: "#e5e7eb",
     borderRadius: 10,
     overflow: "hidden",
+  },
+  list: {
+    maxHeight: 460,
   },
   foodEntry: {
     backgroundColor: "#fff",
@@ -172,7 +175,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
   },
+  loadMoreHint: {
+    fontSize: 11,
+    color: "#9ca3af",
+    textAlign: "center",
+    paddingVertical: 8,
+  },
 });
+
+const PAGE_SIZE = 10;
 
 export function FrequentFoodsSection({
   foods,
@@ -180,9 +191,9 @@ export function FrequentFoodsSection({
   onLoadPortions,
   onAddFood,
 }: FrequentFoodsSectionProps) {
-  const displayFoods = useMemo(() => {
-    return foods ? foods.slice(0, 12) : [];
-  }, [foods]);
+  const allFoods = useMemo(() => foods || [], [foods]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const displayFoods = useMemo(() => allFoods.slice(0, visibleCount), [allFoods, visibleCount]);
 
   const [expandedFoodId, setExpandedFoodId] = useState<number | null>(null);
   const [portionsByFoodId, setPortionsByFoodId] = useState<Record<number, PortionDto[]>>({});
@@ -191,6 +202,10 @@ export function FrequentFoodsSection({
   const [portionAmountByFoodId, setPortionAmountByFoodId] = useState<Record<number, string>>({});
   const [loadingPortionsByFoodId, setLoadingPortionsByFoodId] = useState<Record<number, boolean>>({});
   const [addingFoodId, setAddingFoodId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [allFoods.length]);
 
   useEffect(() => {
     displayFoods.forEach((food) => {
@@ -205,6 +220,13 @@ export function FrequentFoodsSection({
       }
     });
   }, [displayFoods]);
+
+  const onEndReached = () => {
+    if (displayFoods.length >= allFoods.length) {
+      return;
+    }
+    setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, allFoods.length));
+  };
 
   const onToggleFood = async (foodId: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -281,107 +303,124 @@ export function FrequentFoodsSection({
     <View style={s.container}>
       <Text style={s.title}>Frequently Logged</Text>
       <View style={s.results}>
-        {displayFoods.map((food, index) => {
-          const portions = portionsByFoodId[food.id] || [];
-          const isExpanded = expandedFoodId === food.id;
-          const selectedPortionId = selectedPortionIdByFoodId[food.id] ?? null;
-          const selectedPortion = portions.find((p) => p.id === selectedPortionId) || null;
-          const grams = resolveGrams(food.id);
-          const factor = grams / 100;
-          const calories = Math.round(food.calories * factor);
-          const protein = Math.round(food.protein * factor * 10) / 10;
-          const carbs = Math.round(food.carbs * factor * 10) / 10;
-          const fats = Math.round(food.fats * factor * 10) / 10;
-          const isAdding = addingFoodId === food.id;
-          const isLast = index === displayFoods.length - 1;
+        <FlatList
+          data={displayFoods}
+          keyExtractor={(item) => String(item.id)}
+          style={s.list}
+          nestedScrollEnabled
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            displayFoods.length < allFoods.length ? <Text style={s.loadMoreHint}>Scroll to load more...</Text> : null
+          }
+          renderItem={({ item: food, index }) => {
+            const portions = portionsByFoodId[food.id] || [];
+            const isExpanded = expandedFoodId === food.id;
+            const selectedPortionId = selectedPortionIdByFoodId[food.id] ?? null;
+            const selectedPortion = portions.find((p) => p.id === selectedPortionId) || null;
+            const grams = resolveGrams(food.id);
+            const factor = grams / 100;
+            const calories = Math.round(food.calories * factor);
+            const protein = Math.round(food.protein * factor * 10) / 10;
+            const carbs = Math.round(food.carbs * factor * 10) / 10;
+            const fats = Math.round(food.fats * factor * 10) / 10;
+            const isAdding = addingFoodId === food.id;
+            const isLast = index === displayFoods.length - 1;
 
-          return (
-            <View key={food.id} style={[s.foodEntry, isExpanded && s.foodEntryExpanded, !isLast && !isExpanded && s.foodEntryBorder]}>
-              <Pressable
-                onPress={() => onToggleFood(food.id)}
-                style={({ pressed }) => [s.resultRow, !isExpanded && pressed && s.pressed]}
-              >
-                <View style={s.resultTextCol}>
-                  <Text style={[s.resultName, isExpanded && s.resultNameExpanded]} numberOfLines={1}>{food.name}</Text>
-                  {food.brandOrPlace ? <Text style={s.resultSubmeta} numberOfLines={1}>{food.brandOrPlace}</Text> : null}
-                </View>
-                <Text style={s.resultMeta}>{Math.round(food.calories)} kcal</Text>
-              </Pressable>
+            return (
+              <View style={[s.foodEntry, isExpanded && s.foodEntryExpanded, !isLast && !isExpanded && s.foodEntryBorder]}>
+                <Pressable
+                  onPress={() => onToggleFood(food.id)}
+                  style={({ pressed }) => [s.resultRow, !isExpanded && pressed && s.pressed]}
+                >
+                  <View style={s.resultTextCol}>
+                    <Text style={[s.resultName, isExpanded && s.resultNameExpanded]} numberOfLines={1}>{food.name}</Text>
+                    {food.brandOrPlace ? <Text style={s.resultSubmeta} numberOfLines={1}>{food.brandOrPlace}</Text> : null}
+                  </View>
+                  <Text style={s.resultMeta}>{Math.round(food.calories)} kcal</Text>
+                </Pressable>
 
-              {isExpanded ? (
-                <View style={s.expandContent}>
-                  <View style={[s.portionRow, loadingPortionsByFoodId[food.id] && { minHeight: 40, justifyContent: "center" }]}>
-                    {loadingPortionsByFoodId[food.id] ? (
-                      <ActivityIndicator size="small" color="#16a34a" />
-                    ) : (
-                      <>
-                        <Pressable
-                          onPress={() => setSelectedPortionIdByFoodId((prev) => ({ ...prev, [food.id]: null }))}
-                          style={[s.portionChip, selectedPortionId === null && s.portionChipActive]}
-                        >
-                          <Text style={[s.portionChipText, selectedPortionId === null && s.portionChipTextActive]}>Grams</Text>
-                        </Pressable>
-                        {portions.map((portion) => (
+                {isExpanded ? (
+                  <View style={s.expandContent}>
+                    <View style={[s.portionRow, loadingPortionsByFoodId[food.id] && { minHeight: 40, justifyContent: "center" }]}>
+                      {loadingPortionsByFoodId[food.id] ? (
+                        <ActivityIndicator size="small" color="#16a34a" />
+                      ) : (
+                        <>
                           <Pressable
-                            key={portion.id}
-                            onPress={() => setSelectedPortionIdByFoodId((prev) => ({ ...prev, [food.id]: portion.id }))}
-                            style={[s.portionChip, selectedPortionId === portion.id && s.portionChipActive]}
+                            onPress={() => setSelectedPortionIdByFoodId((prev) => ({ ...prev, [food.id]: null }))}
+                            style={[s.portionChip, selectedPortionId === null && s.portionChipActive]}
                           >
-                            <Text style={[s.portionChipText, selectedPortionId === portion.id && s.portionChipTextActive]}>
-                              {portion.portionName} ({Math.round(portion.grams)}g)
-                            </Text>
+                            <Text style={[s.portionChipText, selectedPortionId === null && s.portionChipTextActive]}>Grams</Text>
                           </Pressable>
-                        ))}
-                      </>
+                          {portions.map((portion) => (
+                            <Pressable
+                              key={portion.id}
+                              onPress={() => setSelectedPortionIdByFoodId((prev) => ({ ...prev, [food.id]: portion.id }))}
+                              style={[s.portionChip, selectedPortionId === portion.id && s.portionChipActive]}
+                            >
+                              <Text style={[s.portionChipText, selectedPortionId === portion.id && s.portionChipTextActive]}>
+                                {portion.portionName}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </>
+                      )}
+                    </View>
+
+                    <View style={s.controlsRow}>
+                      {selectedPortion ? (
+                        <TextInput
+                          value={portionAmountByFoodId[food.id] || "1"}
+                          onChangeText={(v) => setPortionAmountByFoodId((prev) => ({ ...prev, [food.id]: v }))}
+                          keyboardType="numeric"
+                          placeholder="Amount"
+                          placeholderTextColor="#9ca3af"
+                          style={s.input}
+                        />
+                      ) : (
+                        <TextInput
+                          value={gramsByFoodId[food.id] || "100"}
+                          onChangeText={(v) => setGramsByFoodId((prev) => ({ ...prev, [food.id]: v }))}
+                          keyboardType="numeric"
+                          placeholder="Grams"
+                          placeholderTextColor="#9ca3af"
+                          style={s.input}
+                        />
+                      )}
+
+                      <Pressable
+                        onPress={() => onAdd(food)}
+                        disabled={isAdding}
+                        style={[s.addBtn, isAdding && s.addBtnDisabled]}
+                      >
+                        <Text style={s.addBtnText}>{isAdding ? "Adding..." : "Add"}</Text>
+                      </Pressable>
+                    </View>
+
+                    <View style={s.previewBox}>
+                      <Text style={s.previewTitle}>Preview ({Math.round(grams * 10) / 10}g)</Text>
+                      <View style={s.previewRow}>
+                        <Text style={s.previewItem}>🔥 {calories} kcal</Text>
+                        <Text style={s.previewItem}>🥩 {protein}g P</Text>
+                        <Text style={s.previewItem}>🍚 {carbs}g C</Text>
+                        <Text style={s.previewItem}>🥑 {fats}g F</Text>
+                      </View>
+                    </View>
+
+                    {selectedPortion ? (
+                      <Text style={s.helper}>
+                        1 {selectedPortion.portionName} = {Math.round(selectedPortion.grams * 10) / 10}g
+                      </Text>
+                    ) : (
+                      <Text style={s.helper}>Direct grams mode</Text>
                     )}
                   </View>
-
-                  <View style={s.previewBox}>
-                    <Text style={s.previewTitle}>
-                      {selectedPortion
-                        ? `Will add (${portionAmountByFoodId[food.id] || "1"} x ${selectedPortion.portionName} = ${grams}g)`
-                        : `Will add (${grams}g)`}
-                    </Text>
-                    <View style={s.previewRow}>
-                      <Text style={s.previewItem}>🔥 {calories} kcal</Text>
-                      <Text style={s.previewItem}>🥩 {protein}g P</Text>
-                      <Text style={s.previewItem}>🍚 {carbs}g C</Text>
-                      <Text style={s.previewItem}>🥑 {fats}g F</Text>
-                    </View>
-                  </View>
-
-                  <View style={s.controlsRow}>
-                    <TextInput
-                      value={selectedPortion ? (portionAmountByFoodId[food.id] ?? "1") : (gramsByFoodId[food.id] ?? "100")}
-                      onChangeText={(value) => {
-                        if (selectedPortion) {
-                          setPortionAmountByFoodId((prev) => ({ ...prev, [food.id]: value }));
-                          return;
-                        }
-                        setGramsByFoodId((prev) => ({ ...prev, [food.id]: value }));
-                      }}
-                      keyboardType="numeric"
-                      placeholder={selectedPortion ? "Amount" : "Grams"}
-                      placeholderTextColor="#9ca3af"
-                      style={s.input}
-                    />
-                    <Pressable
-                      onPress={() => onAdd(food)}
-                      style={[s.addBtn, (isAdding || grams <= 0) && s.addBtnDisabled]}
-                      disabled={isAdding || grams <= 0}
-                    >
-                      <Text style={s.addBtnText}>{isAdding ? "Adding..." : "Add"}</Text>
-                    </Pressable>
-                  </View>
-
-                  {selectedPortion ? (
-                    <Text style={s.helper}>Qty x {selectedPortion.portionName} = {grams}g</Text>
-                  ) : null}
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
+                ) : null}
+              </View>
+            );
+          }}
+        />
       </View>
     </View>
   );

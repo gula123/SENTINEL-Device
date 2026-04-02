@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { useMemo, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { MainTabParamList } from "../../navigation/MainTabs";
 import { useCalendarData } from "../../hooks/useCalendarData";
+import { fetchWeightHistory } from "../../services/weight/weightApi";
 import { useAuth } from "../../state/AuthContext";
 
 // ─── 5-tier color system (matches desktop Calendar.tsx) ─────────────────────
@@ -71,6 +73,7 @@ function MonthPage({
   onPrevMonth,
   onNextMonth,
   navigation,
+  token,
   signOut,
 }: {
   month: dayjs.Dayjs;
@@ -78,6 +81,7 @@ function MonthPage({
   onPrevMonth: () => void;
   onNextMonth: () => void;
   navigation: BottomTabNavigationProp<MainTabParamList, "Progress">;
+  token: string | null;
   signOut: () => void;
 }) {
   const yearMonth = month.format("YYYY-MM");
@@ -100,6 +104,18 @@ function MonthPage({
 
   const vacationSet = useMemo(() => new Set(data?.vacationDays ?? []), [data]);
 
+  const monthStart = month.startOf("month").format("YYYY-MM-DD");
+  const monthEnd = month.endOf("month").format("YYYY-MM-DD");
+  const monthWeightQuery = useQuery({
+    queryKey: ["weightHistory", monthStart, monthEnd],
+    queryFn: async () => {
+      if (!token) throw new Error("AUTH_REQUIRED");
+      return fetchWeightHistory(token, monthStart, monthEnd);
+    },
+    enabled: Boolean(token),
+    staleTime: 5 * 60_000,
+  });
+
   const categoryForDay = (day: number): ColorCategory => {
     if (!day || !data) return "none";
     if (vacationSet.has(day)) return "vacation";
@@ -110,7 +126,7 @@ function MonthPage({
   };
 
   const stats = useMemo(() => {
-    const base = { streak: data?.streak ?? 0, green: 0, yellow: 0, orange: 0, red: 0, vacation: vacationSet.size };
+    const base = { green: 0, yellow: 0, orange: 0, red: 0, vacation: vacationSet.size };
     if (!data?.dailyCalories) return base;
     const entries = Object.entries(data.dailyCalories).filter(([d]) => !vacationSet.has(Number(d)));
     return {
@@ -121,6 +137,32 @@ function MonthPage({
       red: entries.filter(([, { consumed, limit }]) => limit > 0 && consumed / limit > 1.25).length,
     };
   }, [data, vacationSet]);
+
+  const monthlyWeightDelta = useMemo(() => {
+    const logs = (monthWeightQuery.data || []).slice().sort((a, b) =>
+      a.measurementDate.localeCompare(b.measurementDate)
+    );
+
+    if (logs.length === 0) {
+      return null;
+    }
+
+    const first = logs[0].weight;
+    const last = logs[logs.length - 1].weight;
+    return Number((last - first).toFixed(1));
+  }, [monthWeightQuery.data]);
+
+  const weightChangeLabel = useMemo(() => {
+    if (monthlyWeightDelta == null) {
+      return "No data";
+    }
+
+    const sign = monthlyWeightDelta > 0 ? "+" : "";
+    return `${sign}${monthlyWeightDelta.toFixed(1)} kg`;
+  }, [monthlyWeightDelta]);
+
+  const weightChangeColor =
+    monthlyWeightDelta == null ? "#9ca3af" : monthlyWeightDelta > 0 ? "#b91c1c" : monthlyWeightDelta < 0 ? "#166534" : "#92400e";
 
   const isThisMonth = dayjs().isSame(month, "month");
 
@@ -180,9 +222,8 @@ function MonthPage({
       {data ? (
         <>
           <View style={styles.streakCard}>
-            <Text style={styles.streakEmoji}>🔥</Text>
-            <Text style={styles.streakValue}>{stats.streak}</Text>
-            <Text style={styles.streakLabel}>Day streak</Text>
+            <Text style={styles.streakEmoji}>⚖️</Text>
+            <Text style={[styles.streakValue, { color: weightChangeColor }]}>{weightChangeLabel}</Text>
           </View>
 
           <View style={styles.statsCard}>
@@ -297,7 +338,7 @@ export default function ProgressScreen() {
   }, []);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
 
-  const { signOut } = useAuth();
+  const { token, signOut } = useAuth();
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, "Progress">>();
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
@@ -346,6 +387,7 @@ export default function ProgressScreen() {
               onPrevMonth={goPrevMonth}
               onNextMonth={goNextMonth}
               navigation={navigation}
+              token={token}
               signOut={signOut}
             />
           );
@@ -405,7 +447,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  streakEmoji: { fontSize: 16, lineHeight: 20 },
+  streakEmoji: { fontSize: 22, lineHeight: 24 },
   streakValue: { fontSize: 22, fontWeight: "800", color: "#92400e", lineHeight: 24 },
   streakLabel: { fontSize: 11, fontWeight: "700", color: "#b45309", textTransform: "uppercase", letterSpacing: 0.5 },
 

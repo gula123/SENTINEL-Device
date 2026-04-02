@@ -28,7 +28,7 @@ type Props = NativeStackScreenProps<MainStackParamList, "AddFood">;
 
 export default function AddFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
-  const frequentFoodsQuery = useFrequentFoods(10, { enabled: false });
+  const frequentFoodsQuery = useFrequentFoods(100, { enabled: false });
   const { token, signOut } = useAuth();
   const addMutation = useAddFoodLog(date);
 

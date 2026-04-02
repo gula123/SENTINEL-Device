@@ -128,7 +128,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
       queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
       queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
-      showToast(`${MEAL_LABEL[meal]}: food created and logged`);
+      navigation.goBack();
     },
     onError: (err) => {
       handleError(err);
@@ -175,6 +175,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
             <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
             <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set log grams for what you ate now.</Text>
 
+            <Text style={s.inputLabel}>Food name</Text>
             <TextInput
               value={customName}
               onChangeText={setCustomName}
@@ -182,6 +183,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+            <Text style={s.inputLabel}>Brand or place</Text>
             <TextInput
               value={customBrandOrPlace}
               onChangeText={setCustomBrandOrPlace}
@@ -195,6 +197,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
             </Pressable>
             {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
 
+            <Text style={s.inputLabel}>Calories (per 100g)</Text>
             <TextInput
               value={customCalories}
               onChangeText={setCustomCalories}
@@ -203,6 +206,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+            <Text style={s.inputLabel}>Protein (g per 100g)</Text>
             <TextInput
               value={customProtein}
               onChangeText={setCustomProtein}
@@ -211,6 +215,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+            <Text style={s.inputLabel}>Carbs (g per 100g)</Text>
             <TextInput
               value={customCarbs}
               onChangeText={setCustomCarbs}
@@ -219,6 +224,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+            <Text style={s.inputLabel}>Fats (g per 100g)</Text>
             <TextInput
               value={customFats}
               onChangeText={setCustomFats}
@@ -227,6 +233,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+            <Text style={s.inputLabel}>Eaten grams</Text>
             <TextInput
               value={customGrams}
               onChangeText={setCustomGrams}
@@ -334,6 +341,7 @@ const s = StyleSheet.create({
   },
   cardTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 },
   helperText: { fontSize: 12, color: "#6b7280", lineHeight: 17 },
+  inputLabel: { fontSize: 12, fontWeight: "700", color: "#374151", marginTop: 2 },
 
   input: {
     borderWidth: 1,

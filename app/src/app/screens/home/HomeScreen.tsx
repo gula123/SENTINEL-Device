@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDiaryDay } from "../../hooks/useDiaryDay";
 import { useVacationDay } from "../../hooks/useVacationDay";
 import { useUserSettings } from "../../hooks/useUserSettings";
+import { useCalendarData } from "../../hooks/useCalendarData";
 import { type FoodLogDto, type MealType } from "../../services/food/foodLogsApi";
 import { applyQuickFillDay } from "../../services/quickfill/quickFillService";
 import { resolveDayLimits } from "../../services/settings/userSettingsApi";
@@ -163,6 +164,7 @@ function DayView({
   const queryClient = useQueryClient();
   const [showFillOptions, setShowFillOptions] = useState(false);
   const diaryDayQuery = useDiaryDay(date, { enabled: shouldFetch });
+  const calendarMonthQuery = useCalendarData(dayjs(date).format("YYYY-MM"));
   const vacation = useVacationDay(date, { enabled: false });
   const settingsQuery = useUserSettings();
   const summary = diaryDayQuery.data?.summary;
@@ -255,6 +257,11 @@ function DayView({
             {isVacationDay ? "🏖️ Vacation" : "🏖️ Off day"}
           </Text>
         </Pressable>
+
+        <View style={styles.streakChip}>
+          <Text style={styles.streakChipIcon}>🔥</Text>
+          <Text style={styles.streakChipText}>{calendarMonthQuery.data?.streak ?? 0}</Text>
+        </View>
 
         {!isVacationDay ? (
           <Pressable
@@ -569,6 +576,19 @@ const styles = StyleSheet.create({
   vacationChipActive: { backgroundColor: "#fef9c3", borderColor: "#fde047" },
   vacationChipText: { fontSize: 12, fontWeight: "600", color: "#374151" },
   vacationChipTextActive: { color: "#854d0e" },
+  streakChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#fffbeb",
+  },
+  streakChipIcon: { fontSize: 15, lineHeight: 16 },
+  streakChipText: { fontSize: 12, fontWeight: "700", color: "#92400e" },
   quickFillTrigger: {
     borderWidth: 1, borderColor: "#bbf7d0",
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,

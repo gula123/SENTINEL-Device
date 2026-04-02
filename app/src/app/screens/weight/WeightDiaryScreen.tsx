@@ -138,33 +138,53 @@ export default function WeightDiaryScreen() {
       .slice(-24);
   }, [historyQuery.data, latestKnownWeight]);
 
-  const monthlyChartData = useMemo(() => {
+  const weeklyChartData = useMemo(() => {
     if (chartData.length === 0) {
       return [] as Array<{ key: string; date: string; monthLabel: string; weight: number }>;
     }
 
-    const monthLastPoint = new Map<string, { date: string; weight: number }>();
+    const weekLastPoint = new Map<string, { date: string; weight: number }>();
     chartData.forEach((point) => {
-      const monthKey = dayjs(point.date).format("YYYY-MM");
-      const existing = monthLastPoint.get(monthKey);
+      const weekKey = dayjs(point.date).startOf("week").format("YYYY-MM-DD");
+      const existing = weekLastPoint.get(weekKey);
       if (!existing || dayjs(point.date).isAfter(existing.date)) {
-        monthLastPoint.set(monthKey, { date: point.date, weight: point.weight });
+        weekLastPoint.set(weekKey, { date: point.date, weight: point.weight });
       }
     });
 
-    return Array.from(monthLastPoint.entries())
-      .map(([monthKey, value]) => ({
-        key: monthKey,
-        date: value.date,
-        monthLabel: dayjs(`${monthKey}-01`).format("MMM"),
-        weight: value.weight,
-      }))
-      .sort((a, b) => dayjs(a.key).diff(dayjs(b.key)))
-      .slice(-12);
+    const today = dayjs();
+    const start = today.startOf("month").subtract(11, "month").startOf("week");
+    const endWeek = today.startOf("week");
+
+    const points: Array<{ key: string; date: string; monthLabel: string; weight: number }> = [];
+    let cursor = start;
+    let lastKnownWeight: number | null = null;
+
+    while (cursor.isBefore(endWeek) || cursor.isSame(endWeek, "day")) {
+      const weekKey = cursor.format("YYYY-MM-DD");
+      const weekPoint = weekLastPoint.get(weekKey);
+      if (weekPoint) {
+        lastKnownWeight = weekPoint.weight;
+      }
+
+      if (lastKnownWeight != null) {
+        const isCurrentWeek = cursor.isSame(endWeek, "day");
+        points.push({
+          key: weekKey,
+          date: weekPoint?.date || (isCurrentWeek ? today.format("YYYY-MM-DD") : cursor.format("YYYY-MM-DD")),
+          monthLabel: cursor.format("MMM"),
+          weight: lastKnownWeight,
+        });
+      }
+
+      cursor = cursor.add(1, "week");
+    }
+
+    return points;
   }, [chartData]);
 
   const chartMetrics = useMemo(() => {
-    if (monthlyChartData.length === 0) {
+    if (weeklyChartData.length === 0) {
       return {
         min: 0,
         max: 0,
@@ -176,7 +196,7 @@ export default function WeightDiaryScreen() {
       };
     }
 
-    const weights = monthlyChartData.map((point) => point.weight);
+    const weights = weeklyChartData.map((point) => point.weight);
     const min = Math.min(...weights);
     const max = Math.max(...weights);
     const weightRange = max - min;
@@ -207,27 +227,35 @@ export default function WeightDiaryScreen() {
     const labelStep = axisSpan / segments;
 
     return { min, max, axisMin, axisMax, tickInterval, segments, labelStep };
-  }, [monthlyChartData]);
+  }, [weeklyChartData]);
 
   const chartWidth = Math.max(280, windowWidth - 68);
   const chartLabels = useMemo(() => {
-    if (monthlyChartData.length === 0) return [] as string[];
-    return monthlyChartData.map((point) => point.monthLabel);
-  }, [monthlyChartData]);
+    if (weeklyChartData.length === 0) return [] as string[];
+    let previousMonth = "";
+    return weeklyChartData.map((point) => {
+      const currentMonth = dayjs(point.date).format("MMM");
+      if (currentMonth === previousMonth) {
+        return "";
+      }
+      previousMonth = currentMonth;
+      return currentMonth;
+    });
+  }, [weeklyChartData]);
 
   const chartDataset = useMemo(() => {
-    return monthlyChartData.map((point) => Number(point.weight.toFixed(2)));
-  }, [monthlyChartData]);
+    return weeklyChartData.map((point) => Number(point.weight.toFixed(2)));
+  }, [weeklyChartData]);
 
   const axisFloorDataset = useMemo(() => {
-    if (monthlyChartData.length === 0) return [] as number[];
+    if (weeklyChartData.length === 0) return [] as number[];
     return [chartMetrics.axisMin];
-  }, [monthlyChartData.length, chartMetrics.axisMin]);
+  }, [weeklyChartData.length, chartMetrics.axisMin]);
 
   const axisCeilDataset = useMemo(() => {
-    if (monthlyChartData.length === 0) return [] as number[];
+    if (weeklyChartData.length === 0) return [] as number[];
     return [chartMetrics.axisMax];
-  }, [monthlyChartData.length, chartMetrics.axisMax]);
+  }, [weeklyChartData.length, chartMetrics.axisMax]);
 
   const stats = statsQuery.data;
 
@@ -250,11 +278,11 @@ export default function WeightDiaryScreen() {
           <Text style={s.chartTitle}>Weight Progress</Text>
           {historyQuery.isLoading ? (
             <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 8 }} />
-          ) : monthlyChartData.length === 0 ? (
+          ) : weeklyChartData.length === 0 ? (
             <Text style={s.muted}>No weight data yet.</Text>
           ) : (
             <>
-              <Text style={s.chartSub}>Last 12 months (month-end value)</Text>
+              <Text style={s.chartSub}>Last 12 months (weekly points)</Text>
               <View style={s.chartBox}>
                 <LineChart
                   data={{
