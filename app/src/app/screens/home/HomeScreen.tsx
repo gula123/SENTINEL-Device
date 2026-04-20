@@ -65,7 +65,8 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
   const pC = limits && limits.carbsLimit   > 0 ? Math.min(1, totalCarbs   / limits.carbsLimit)   : 0;
   const pF = limits && limits.fatsLimit    > 0 ? Math.min(1, totalFats    / limits.fatsLimit)    : 0;
 
-  const calPct  = calLimit && calLimit > 0 ? totalCal / calLimit : 0;
+  const hasCalorieLimit = calLimit != null;
+  const calPct  = hasCalorieLimit && calLimit > 0 ? totalCal / calLimit : 0;
   const calColor = resolveLimitColor(totalCal, calLimit ?? 0);
   const proteinColor = resolveLimitColor(totalProtein, limits?.proteinLimit ?? 0, true);
   const carbsColor = resolveLimitColor(totalCarbs, limits?.carbsLimit ?? 0);
@@ -82,9 +83,9 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
         <Text style={styles.mealName}>{MEAL_LABEL[meal]}</Text>
         <View style={styles.mealCalBlock}>
           <Text style={[styles.mealCal, { color: calColor }]}>
-            {Math.round(totalCal)}{calLimit ? ` / ${calLimit}` : ""} kcal
+            {hasCalorieLimit ? `${calLimit} / ${Math.round(totalCal)}` : `${Math.round(totalCal)}`} kcal
           </Text>
-          {calLimit ? (
+          {hasCalorieLimit ? (
             <View style={styles.mealCalTrack}>
               <View style={[styles.mealCalFill, { width: `${Math.min(100, Math.round(calPct * 100))}%` as any, backgroundColor: calColor }]} />
             </View>
