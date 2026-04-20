@@ -141,6 +141,17 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           </View>
         </ScrollView>
 
+        <View style={s.footer}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to meal statistics"
+            style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
+          >
+            <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
+          </Pressable>
+        </View>
+
         {toastMessage ? (
           <Animated.View
             style={[
@@ -163,17 +174,6 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           </Animated.View>
         ) : null}
       </KeyboardAvoidingView>
-
-      <View style={s.footer}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Back to meal statistics"
-          style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
-        >
-          <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -278,7 +278,7 @@ const s = StyleSheet.create({
 
   toast: {
     position: "absolute",
-    bottom: 24,
+    bottom: 86,
     left: 24,
     right: 24,
     backgroundColor: "#166534",
