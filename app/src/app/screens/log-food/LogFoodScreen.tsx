@@ -510,7 +510,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       await updateMutation.mutateAsync({ logId: editingLog.id, grams: g });
       invalidate();
       onCancelEditLog();
-      Alert.alert("Updated", "Food grams updated.");
+      showToast("Food grams updated.");
     } catch (err) {
       handleError(err);
     }
