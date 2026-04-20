@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import {
@@ -161,7 +162,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
-            <Text style={s.backIcon}>←</Text>
+            <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
@@ -323,7 +324,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { fontSize: 18, color: "#374151", lineHeight: 22 },
   headerTitle: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   headerIcon: { fontSize: 20 },
   headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
