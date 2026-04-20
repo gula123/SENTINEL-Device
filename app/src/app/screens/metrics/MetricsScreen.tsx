@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -53,6 +53,24 @@ type Stats = {
   yearlyPerMealCalorieAdherence: number;
 };
 
+type MonthlyOutcome = {
+  score: number;
+  confidence: "Low" | "Medium" | "High";
+  label: string;
+  averageDailyCalories: number;
+  estimatedMaintenance: number | null;
+  planAdequacy: "Supports loss" | "Near maintenance" | "Too lenient" | "Insufficient history";
+  dayTypes: { green: number; yellow: number; orange: number; red: number; active: number };
+  drivers: string[];
+};
+
+type HistoricalMonthSummary = {
+  monthKey: string;
+  averageDailyCalories: number;
+  loggedDays: number;
+  weightDelta: number | null;
+};
+
 type PerDayLimits = Record<
   string,
   {
@@ -81,6 +99,26 @@ const calculateMinimumSuccess = (consumed: number, limit: number) => {
 };
 
 const clampOneDecimal = (value: number) => Number(value.toFixed(1));
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const classifyDayType = (consumed: number, limit: number) => {
+  if (limit <= 0) return "active" as const;
+  const ratio = consumed / limit;
+  if (ratio < 1.0) return "perfect" as const;
+  if (ratio < 1.08) return "good" as const;
+  if (ratio < 1.15) return "warning" as const;
+  if (ratio < 1.25) return "caution" as const;
+  return "exceeded" as const;
+};
+
+const outcomeLabelForScore = (score: number) => {
+  if (score >= 35) return "Likely weight loss";
+  if (score <= -35) return "Likely fat gain";
+  return "Likely maintenance";
+};
+
+const average = (values: number[]) => values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
 type MetricColorTier = {
   bg: string;
@@ -114,7 +152,7 @@ export default function MetricsScreen() {
 
   const isAuthExpired = metricsQuery.error instanceof Error && metricsQuery.error.message === "AUTH_EXPIRED";
 
-  const { stats, monthlyData } = useMemo(() => {
+  const { stats, monthlyData, outcome } = useMemo(() => {
     const emptyStats: Stats = {
       monthlyHabitRate: 0,
       yearlyHabitRate: 0,
@@ -132,8 +170,19 @@ export default function MetricsScreen() {
       yearlyPerMealCalorieAdherence: 0,
     };
 
+    const emptyOutcome: MonthlyOutcome = {
+      score: 0,
+      confidence: "Low",
+      label: "Likely maintenance",
+      averageDailyCalories: 0,
+      estimatedMaintenance: null,
+      planAdequacy: "Insufficient history",
+      dayTypes: { green: 0, yellow: 0, orange: 0, red: 0, active: 0 },
+      drivers: ["Not enough monthly data yet"],
+    };
+
     if (!metricsQuery.data) {
-      return { stats: emptyStats, monthlyData: [] as MonthlyPoint[] };
+      return { stats: emptyStats, monthlyData: [] as MonthlyPoint[], outcome: emptyOutcome };
     }
 
     const { foodLogs, habitLogs, weightLogs, userSettings } = metricsQuery.data;
@@ -357,24 +406,188 @@ export default function MetricsScreen() {
       };
     });
 
+    const monthlyWeightSummary = new Map<string, { first: number; last: number; count: number }>();
+    sortedWeights.forEach((log) => {
+      const monthKey = dayjs(log.measurementDate).format("YYYY-MM");
+      const current = monthlyWeightSummary.get(monthKey);
+      if (!current) {
+        monthlyWeightSummary.set(monthKey, { first: log.weight, last: log.weight, count: 1 });
+        return;
+      }
+      current.last = log.weight;
+      current.count += 1;
+      monthlyWeightSummary.set(monthKey, current);
+    });
+
+    const historicalMonths: HistoricalMonthSummary[] = Array.from(monthlyMap.entries()).map(([monthKey, bucket]) => {
+      const withFood = bucket.points.filter((point) => point.hasFoodData);
+      const averageDailyCalories = withFood.length > 0
+        ? average(withFood.map((point) => point.caloriesConsumed))
+        : 0;
+      const weightSummary = monthlyWeightSummary.get(monthKey);
+      const weightDelta = weightSummary && weightSummary.count >= 2
+        ? weightSummary.last - weightSummary.first
+        : null;
+
+      return {
+        monthKey,
+        averageDailyCalories,
+        loggedDays: withFood.length,
+        weightDelta,
+      };
+    });
+
+    const monthlyHabitRateValue = habitRate(monthlyDailyPoints);
+    const yearlyHabitRateValue = habitRate(yearlyDailyPoints);
+    const monthlyCalorieAdherenceValue = averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "caloriesConsumed", "calorieLimit");
+    const yearlyCalorieAdherenceValue = averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "caloriesConsumed", "calorieLimit");
+    const monthlyCarbsAdherenceValue = averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "carbsConsumed", "carbsLimit");
+    const yearlyCarbsAdherenceValue = averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "carbsConsumed", "carbsLimit");
+    const monthlyProteinAdherenceValue = averageAdherence(monthlyDailyPoints, calculateMinimumSuccess, "proteinConsumed", "proteinLimit");
+    const yearlyProteinAdherenceValue = averageAdherence(yearlyDailyPoints, calculateMinimumSuccess, "proteinConsumed", "proteinLimit");
+    const monthlyFatsAdherenceValue = averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "fatsConsumed", "fatsLimit");
+    const yearlyFatsAdherenceValue = averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "fatsConsumed", "fatsLimit");
+    const monthlyPerMealAdherenceValue = mealAdherence("month");
+    const yearlyPerMealAdherenceValue = mealAdherence("year");
+
+    const dayTypeCounts = { green: 0, yellow: 0, orange: 0, red: 0, active: 0 };
+    const dayTypeScoreMap = {
+      perfect: 1.0,
+      good: 0.7,
+      warning: 0.1,
+      caution: -0.5,
+      exceeded: -1.0,
+      active: 0,
+    } as const;
+    let dayTypeScoreAccumulator = 0;
+    let dayTypeScoreSamples = 0;
+
+    monthlyDailyPoints
+      .filter((point) => point.hasFoodData)
+      .forEach((point) => {
+        const dayType = classifyDayType(point.caloriesConsumed, point.calorieLimit);
+        if (dayType === "perfect" || dayType === "good") dayTypeCounts.green += 1;
+        else if (dayType === "warning") dayTypeCounts.yellow += 1;
+        else if (dayType === "caution") dayTypeCounts.orange += 1;
+        else if (dayType === "exceeded") dayTypeCounts.red += 1;
+        else dayTypeCounts.active += 1;
+
+        dayTypeScoreAccumulator += dayTypeScoreMap[dayType];
+        dayTypeScoreSamples += 1;
+      });
+
+    const dayTypeScore = dayTypeScoreSamples > 0 ? clamp((dayTypeScoreAccumulator / dayTypeScoreSamples) * 100, -100, 100) : 0;
+    const mealHabitScore = clamp(((monthlyPerMealAdherenceValue - 50) * 2) * 0.6 + ((monthlyHabitRateValue - 50) * 2) * 0.4, -100, 100);
+
+    const monthlyWeightChanges = monthlyDailyPoints.map((point) => point.weightChange).filter((value) => value !== 0);
+    const avgWeightChange = monthlyWeightChanges.length > 0
+      ? monthlyWeightChanges.reduce((sum, value) => sum + value, 0) / monthlyWeightChanges.length
+      : 0;
+    const weightTrendScore = clamp(-avgWeightChange * 80, -100, 100);
+
+    const currentMonthKey = now.format("YYYY-MM");
+    const currentMonthSummary = historicalMonths.find((month) => month.monthKey === currentMonthKey) || null;
+    const priorHistoricalMonths = historicalMonths.filter((month) => month.monthKey !== currentMonthKey && month.loggedDays >= 7 && month.averageDailyCalories > 0);
+
+    const maintenanceCandidates = priorHistoricalMonths
+      .filter((month) => month.weightDelta != null && Math.abs(month.weightDelta) <= 0.6)
+      .map((month) => month.averageDailyCalories);
+    const gainingCandidates = priorHistoricalMonths
+      .filter((month) => month.weightDelta != null && month.weightDelta > 0.6)
+      .map((month) => month.averageDailyCalories);
+    const losingCandidates = priorHistoricalMonths
+      .filter((month) => month.weightDelta != null && month.weightDelta < -0.6)
+      .map((month) => month.averageDailyCalories);
+
+    let estimatedMaintenance: number | null = null;
+    if (maintenanceCandidates.length > 0) {
+      estimatedMaintenance = average(maintenanceCandidates);
+    } else if (gainingCandidates.length > 0 && losingCandidates.length > 0) {
+      estimatedMaintenance = (Math.min(...gainingCandidates) + Math.max(...losingCandidates)) / 2;
+    } else if (gainingCandidates.length > 0) {
+      estimatedMaintenance = Math.min(...gainingCandidates) * 0.9;
+    } else if (losingCandidates.length > 0) {
+      estimatedMaintenance = Math.max(...losingCandidates) * 1.1;
+    }
+
+    const currentAverageCalories = currentMonthSummary?.averageDailyCalories ?? 0;
+    const adequacyDifferencePct = estimatedMaintenance && currentAverageCalories > 0
+      ? (currentAverageCalories - estimatedMaintenance) / estimatedMaintenance
+      : 0;
+    const adequacyScore = estimatedMaintenance && currentAverageCalories > 0
+      ? clamp(-(adequacyDifferencePct * 250), -100, 100)
+      : 0;
+
+    const planAdequacy: MonthlyOutcome["planAdequacy"] = !estimatedMaintenance || currentAverageCalories <= 0
+      ? "Insufficient history"
+      : adequacyDifferencePct > 0.07
+        ? "Too lenient"
+        : adequacyDifferencePct < -0.07
+          ? "Supports loss"
+          : "Near maintenance";
+
+    const outcomeScore = clamp((dayTypeScore * 0.3) + (mealHabitScore * 0.2) + (weightTrendScore * 0.1) + (adequacyScore * 0.4), -100, 100);
+
+    const loggedDays = monthlyDailyPoints.filter((point) => point.hasFoodData).length;
+    const confidence = loggedDays >= 20 && priorHistoricalMonths.length >= 3
+      ? "High"
+      : loggedDays >= 10 && priorHistoricalMonths.length >= 1
+        ? "Medium"
+        : "Low";
+
+    const drivers: string[] = [];
+    drivers.push(`Day mix: ${dayTypeCounts.green} green, ${dayTypeCounts.yellow} yellow, ${dayTypeCounts.orange} orange, ${dayTypeCounts.red} red`);
+
+    if (estimatedMaintenance && currentAverageCalories > 0) {
+      drivers.push(`Avg logged intake ${Math.round(currentAverageCalories)} kcal vs estimated maintenance ${Math.round(estimatedMaintenance)} kcal`);
+    }
+
+    drivers.push(`Meal consistency ${Math.round(monthlyPerMealAdherenceValue)}%`);
+    drivers.push(`Habit completion ${Math.round(monthlyHabitRateValue)}%`);
+
+    if (avgWeightChange !== 0) {
+      const direction = avgWeightChange > 0 ? "up" : "down";
+      drivers.push(`Recent weight trend ${direction} (${Math.abs(clampOneDecimal(avgWeightChange))} kg avg change)`);
+    }
+
+    if (planAdequacy === "Too lenient") drivers.push("Current intake looks above your historical weight-neutral zone");
+    if (planAdequacy === "Supports loss") drivers.push("Current intake looks below your historical weight-neutral zone");
+
+    const confidenceReason = confidence === "High"
+      ? `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior months`
+      : confidence === "Medium"
+        ? `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior month${priorHistoricalMonths.length !== 1 ? "s" : ""} (need 20+ days & 3+ months for High)`
+        : `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior month${priorHistoricalMonths.length !== 1 ? "s" : ""} (need 10+ days & 1+ month for Medium)`;
+    drivers.push(confidenceReason);
+
     return {
       stats: {
-        monthlyHabitRate: habitRate(monthlyDailyPoints),
-        yearlyHabitRate: habitRate(yearlyDailyPoints),
-        monthlyCalorieAdherence: averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "caloriesConsumed", "calorieLimit"),
-        yearlyCalorieAdherence: averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "caloriesConsumed", "calorieLimit"),
+        monthlyHabitRate: monthlyHabitRateValue,
+        yearlyHabitRate: yearlyHabitRateValue,
+        monthlyCalorieAdherence: monthlyCalorieAdherenceValue,
+        yearlyCalorieAdherence: yearlyCalorieAdherenceValue,
         monthlyCorrelation: correlationFor(monthlyDailyPoints),
         yearlyCorrelation: correlationFor(yearlyDailyPoints),
-        monthlyCarbsAdherence: averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "carbsConsumed", "carbsLimit"),
-        yearlyCarbsAdherence: averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "carbsConsumed", "carbsLimit"),
-        monthlyProteinAdherence: averageAdherence(monthlyDailyPoints, calculateMinimumSuccess, "proteinConsumed", "proteinLimit"),
-        yearlyProteinAdherence: averageAdherence(yearlyDailyPoints, calculateMinimumSuccess, "proteinConsumed", "proteinLimit"),
-        monthlyFatsAdherence: averageAdherence(monthlyDailyPoints, calculateMaximumSuccess, "fatsConsumed", "fatsLimit"),
-        yearlyFatsAdherence: averageAdherence(yearlyDailyPoints, calculateMaximumSuccess, "fatsConsumed", "fatsLimit"),
-        monthlyPerMealCalorieAdherence: mealAdherence("month"),
-        yearlyPerMealCalorieAdherence: mealAdherence("year"),
+        monthlyCarbsAdherence: monthlyCarbsAdherenceValue,
+        yearlyCarbsAdherence: yearlyCarbsAdherenceValue,
+        monthlyProteinAdherence: monthlyProteinAdherenceValue,
+        yearlyProteinAdherence: yearlyProteinAdherenceValue,
+        monthlyFatsAdherence: monthlyFatsAdherenceValue,
+        yearlyFatsAdherence: yearlyFatsAdherenceValue,
+        monthlyPerMealCalorieAdherence: monthlyPerMealAdherenceValue,
+        yearlyPerMealCalorieAdherence: yearlyPerMealAdherenceValue,
       },
       monthlyData: monthlySeries,
+      outcome: {
+        score: clampOneDecimal(outcomeScore),
+        confidence,
+        label: outcomeLabelForScore(outcomeScore),
+        averageDailyCalories: clampOneDecimal(currentAverageCalories),
+        estimatedMaintenance: estimatedMaintenance ? clampOneDecimal(estimatedMaintenance) : null,
+        planAdequacy,
+        dayTypes: dayTypeCounts,
+        drivers,
+      },
     };
   }, [metricsQuery.data]);
 
@@ -418,6 +631,8 @@ export default function MetricsScreen() {
 
         {!metricsQuery.isLoading && !metricsQuery.isError ? (
           <>
+            <MonthlyOutcomeCard outcome={outcome} />
+
             <View style={s.cardGrid}>
               <StatPairCard title="Habit Completion Rate" month={stats.monthlyHabitRate} year={stats.yearlyHabitRate} />
               <StatPairCard title="Calorie Target Success" month={stats.monthlyCalorieAdherence} year={stats.yearlyCalorieAdherence} />
@@ -471,6 +686,57 @@ export default function MetricsScreen() {
         ) : null}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function MonthlyOutcomeCard({ outcome }: { outcome: MonthlyOutcome }) {
+  const [showSignals, setShowSignals] = useState(false);
+  const pointerLeft = `${((outcome.score + 100) / 200) * 100}%`;
+
+  return (
+    <View style={s.outcomeCard}>
+      <View style={s.outcomeHeader}>
+        <Text style={s.outcomeTitle}>Monthly Outcome Projection</Text>
+        <View style={s.outcomeConfidencePill}>
+          <Text style={s.outcomeConfidenceText}>{outcome.confidence} confidence</Text>
+        </View>
+      </View>
+
+      <View style={s.outcomeScaleWrap}>
+        <View style={s.outcomeScaleTrack}>
+          <View style={s.outcomeScaleLeft} />
+          <View style={s.outcomeScaleCenter} />
+          <View style={s.outcomeScaleRight} />
+        </View>
+        <View style={[s.outcomePointer, { left: pointerLeft }]} />
+      </View>
+
+      <View style={s.outcomeLegendRow}>
+        <Text style={s.outcomeLegendLeft}>Fat gain risk</Text>
+        <Text style={s.outcomeLegendRight}>Weight loss direction</Text>
+      </View>
+
+      <Pressable
+        onPress={() => setShowSignals((prev) => !prev)}
+        accessibilityRole="button"
+        style={({ pressed }) => [s.outcomeSignalsToggle, pressed && s.pressed]}
+      >
+        <Text style={s.outcomeSignalsToggleText}>{showSignals ? "Hide signals ▴" : "Show signals ▾"}</Text>
+      </Pressable>
+
+      {showSignals ? (
+        <View style={s.outcomeSignalsWrap}>
+          <Text style={s.outcomeSignalsTitle}>Signals considered</Text>
+          <View style={s.outcomeSignalGrid}>
+            {outcome.drivers.map((driver) => (
+              <View key={driver} style={s.outcomeSignalChip}>
+                <Text style={s.outcomeSignalText}>{driver}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -612,4 +878,67 @@ const s = StyleSheet.create({
     borderRadius: 10,
     marginLeft: -16,
   },
+
+  outcomeCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 12,
+    gap: 8,
+  },
+  outcomeHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  outcomeTitle: { fontSize: 15, fontWeight: "800", color: "#111827" },
+  outcomeSignalsToggle: { alignSelf: "center", paddingVertical: 6, paddingHorizontal: 12, marginTop: 4 },
+  outcomeSignalsToggleText: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+  outcomeConfidencePill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#f9fafb",
+  },
+  outcomeConfidenceText: { fontSize: 11, color: "#374151", fontWeight: "700" },
+  outcomeScaleWrap: { position: "relative", paddingVertical: 8 },
+  outcomeScaleTrack: {
+    height: 12,
+    borderRadius: 99,
+    overflow: "hidden",
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  outcomeScaleLeft: { flex: 1, backgroundColor: "#fecaca" },
+  outcomeScaleCenter: { flex: 1, backgroundColor: "#fef9c3" },
+  outcomeScaleRight: { flex: 1, backgroundColor: "#86efac" },
+  outcomePointer: {
+    position: "absolute",
+    top: 3,
+    width: 2,
+    height: 22,
+    backgroundColor: "#111827",
+    transform: [{ translateX: -1 }],
+  },
+  outcomeLegendRow: { flexDirection: "row", justifyContent: "space-between" },
+  outcomeLegendLeft: { fontSize: 11, color: "#991b1b", fontWeight: "700" },
+  outcomeLegendRight: { fontSize: 11, color: "#166534", fontWeight: "700" },
+  outcomeSignalsWrap: {
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
+    paddingTop: 10,
+  },
+  outcomeSignalsTitle: { fontSize: 11, color: "#6b7280", fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  outcomeSignalGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  outcomeSignalChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    maxWidth: "100%",
+  },
+  outcomeSignalText: { fontSize: 11, color: "#374151", fontWeight: "600" },
 });
