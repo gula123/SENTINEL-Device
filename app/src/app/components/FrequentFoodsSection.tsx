@@ -228,11 +228,19 @@ export function FrequentFoodsSection({
     setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, allFoods.length));
   };
 
+  const restoreDefaultGrams = (foodId: number) => {
+    setGramsByFoodId((prev) => ({ ...prev, [foodId]: "100" }));
+  };
+
   const onToggleFood = async (foodId: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (expandedFoodId === foodId) {
+      restoreDefaultGrams(foodId);
       setExpandedFoodId(null);
       return;
+    }
+    if (expandedFoodId !== null) {
+      restoreDefaultGrams(expandedFoodId);
     }
     setExpandedFoodId(foodId);
     if (!portionsByFoodId[foodId] && !loadingPortionsByFoodId[foodId]) {
@@ -262,7 +270,7 @@ export function FrequentFoodsSection({
       const amount = Number.isFinite(amountRaw) && amountRaw > 0 ? amountRaw : 0;
       return Math.round(selectedPortion.grams * amount * 10) / 10;
     }
-    const gramsRaw = Number(gramsByFoodId[foodId] || "100");
+    const gramsRaw = Number(gramsByFoodId[foodId] ?? "100");
     return Number.isFinite(gramsRaw) && gramsRaw > 0 ? gramsRaw : 0;
   };
 
@@ -371,7 +379,7 @@ export function FrequentFoodsSection({
                     <View style={s.controlsRow}>
                       {selectedPortion ? (
                         <TextInput
-                          value={portionAmountByFoodId[food.id] || "1"}
+                          value={portionAmountByFoodId[food.id] ?? "1"}
                           onChangeText={(v) => setPortionAmountByFoodId((prev) => ({ ...prev, [food.id]: v }))}
                           keyboardType="numeric"
                           placeholder="Amount"
@@ -380,7 +388,7 @@ export function FrequentFoodsSection({
                         />
                       ) : (
                         <TextInput
-                          value={gramsByFoodId[food.id] || "100"}
+                          value={gramsByFoodId[food.id] ?? "100"}
                           onChangeText={(v) => setGramsByFoodId((prev) => ({ ...prev, [food.id]: v }))}
                           keyboardType="numeric"
                           placeholder="Grams"
