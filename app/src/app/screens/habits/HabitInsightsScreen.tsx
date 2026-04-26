@@ -682,10 +682,12 @@ export default function HabitInsightsScreen() {
                 }}
               >
                 <FlatList
+                  key={calendarPagerWidth}
                   ref={calendarPagerRef}
                   data={calendarMonths}
                   horizontal
                   pagingEnabled
+                  disableIntervalMomentum
                   bounces={false}
                   showsHorizontalScrollIndicator={false}
                   initialScrollIndex={CALENDAR_MONTHS_RANGE}
