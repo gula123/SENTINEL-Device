@@ -29,6 +29,7 @@ import {
   type HabitMetrics,
 } from "../../services/habits/habitApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 type DayStatus = "unknown" | "success" | "no-success";
 
@@ -114,6 +115,7 @@ function HabitFormModal({
   isSaving,
   onClose,
   onSubmit,
+  t,
 }: {
   visible: boolean;
   formState: FormState;
@@ -121,12 +123,13 @@ function HabitFormModal({
   isSaving: boolean;
   onClose: () => void;
   onSubmit: () => void;
+  t: (key: string) => string;
 }) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>New Habit</Text>
+          <Text style={styles.modalTitle}>{t("habits.create")}</Text>
           <Text style={styles.modalSubtitle}>Create the same habit widgets you use on the frontend.</Text>
 
           <Text style={styles.fieldLabel}>Habit Name</Text>
@@ -227,6 +230,7 @@ export default function HabitsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const queryClient = useQueryClient();
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const [modalVisible, setModalVisible] = useState(false);
   const [formState, setFormState] = useState<FormState>(createFormState());
 
@@ -391,7 +395,7 @@ export default function HabitsScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.pageHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pageTitle}>Habits</Text>
+            <Text style={styles.pageTitle}>{t("habits.title")}</Text>
             <Text style={styles.pageSubtitle}>Your frontend habit widgets, optimized for mobile.</Text>
           </View>
           <Pressable onPress={openCreateModal} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
@@ -402,16 +406,16 @@ export default function HabitsScreen() {
         {isLoading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text style={styles.loadingText}>Loading habits...</Text>
+            <Text style={styles.loadingText}>{t("habits.loading")}</Text>
           </View>
         ) : null}
 
         {habitsQuery.isError || widgetQuery.isError ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>{isAuthExpired ? "Session expired" : "Failed to load habits"}</Text>
+            <Text style={styles.errorTitle}>{isAuthExpired ? t("settings.sessionExpired") : t("habits.loadingFailed")}</Text>
             <Text style={styles.errorText}>
               {isAuthExpired
-                ? "Please sign in again."
+                ? t("settings.sessionExpired")
                 : (habitsQuery.error as Error)?.message || (widgetQuery.error as Error)?.message}
             </Text>
             <View style={styles.row}>
@@ -495,6 +499,7 @@ export default function HabitsScreen() {
         setFormState={setFormState}
         isSaving={saveMutation.isPending}
         onClose={closeModal}
+        t={t}
         onSubmit={() => {
           saveMutation.mutate(undefined, {
             onError: (error) => {

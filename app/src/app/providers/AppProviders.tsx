@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setSessionRefreshHandler } from "../services/auth/authSessionBridge";
 import { isAuthExpiredError, notifyAuthExpired, setAuthExpiredHandler } from "../services/auth/authEvents";
 import { AuthProvider, useAuth } from "../state/AuthContext";
+import { LanguageProvider } from "../state/LanguageContext";
 import { warmupBackend } from "../services/api/client";
 
 function AuthSessionBridge({ children }: PropsWithChildren) {
@@ -73,9 +74,11 @@ export default function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthSessionBridge>{children}</AuthSessionBridge>
-        </QueryClientProvider>
+        <LanguageProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthSessionBridge>{children}</AuthSessionBridge>
+          </QueryClientProvider>
+        </LanguageProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

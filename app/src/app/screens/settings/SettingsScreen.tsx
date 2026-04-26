@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Picker } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "../../hooks/useUserSettings";
@@ -11,6 +11,8 @@ import {
   type PerDayLimitsResolved,
 } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
+import { type Language } from "../../utils/i18n";
 
 function MacroInput({ label, value, onChange }: { label: string; value: number; onChange: (v: string) => void }) {
   return (
@@ -38,6 +40,7 @@ function MacroInput({ label, value, onChange }: { label: string; value: number; 
 
 export default function SettingsScreen() {
   const { token, signOut } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const queryClient = useQueryClient();
   const settingsQuery = useUserSettings();
 
@@ -74,13 +77,14 @@ export default function SettingsScreen() {
         dailyCarbsLimit: mondayOverall?.carbs ?? 250,
         dailyFatsLimit: mondayOverall?.fats ?? 65,
         perDayCalorieLimits: perDay,
+        language,
       };
 
       return saveUserSettings(token, payload);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["userSettings"] });
-      Alert.alert("Settings", "Saved successfully");
+      Alert.alert(t("settings.title"), t("settings.saved"));
     },
   });
 
@@ -140,47 +144,73 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Settings</Text>
+        <Text style={styles.pageTitle}>{t("settings.title")}</Text>
 
         {settingsQuery.isLoading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text style={styles.loadingText}>Loading settings…</Text>
+            <Text style={styles.loadingText}>{t("settings.loadingSettings")}</Text>
           </View>
         ) : null}
 
         {settingsQuery.isError ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>Failed to load settings</Text>
-            <Text style={styles.errorText}>{isAuthExpired ? "Session expired. Please sign in again." : (settingsQuery.error as Error).message}</Text>
+            <Text style={styles.errorTitle}>{t("settings.failedToLoadSettings")}</Text>
+            <Text style={styles.errorText}>{isAuthExpired ? t("settings.sessionExpired") : (settingsQuery.error as Error).message}</Text>
             <View style={styles.row}>
               {isAuthExpired ? (
                 <Pressable onPress={signOut} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                  <Text style={styles.secondaryBtnText}>Sign in again</Text>
+                  <Text style={styles.secondaryBtnText}>{t("settings.signInAgain")}</Text>
                 </Pressable>
               ) : null}
               <Pressable onPress={() => settingsQuery.refetch()} style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
-                <Text style={styles.primaryBtnText}>Retry</Text>
+                <Text style={styles.primaryBtnText}>{t("settings.retry")}</Text>
               </Pressable>
             </View>
           </View>
         ) : null}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Profile</Text>
-          <Text style={styles.fieldLabel}>Name</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Enter your name" style={styles.input} />
+          <Text style={styles.sectionTitle}>{t("settings.profile")}</Text>
+          <Text style={styles.fieldLabel}>{t("settings.name")}</Text>
+          <TextInput value={name} onChangeText={setName} placeholder={t("settings.name")} style={styles.input} />
 
-          <Text style={styles.fieldLabel}>Email</Text>
-          <TextInput value={email} onChangeText={setEmail} placeholder="Enter your email" autoCapitalize="none" style={styles.input} />
+          <Text style={styles.fieldLabel}>{t("settings.email")}</Text>
+          <TextInput value={email} onChangeText={setEmail} placeholder={t("settings.email")} autoCapitalize="none" style={styles.input} />
 
-          <Text style={styles.fieldLabel}>Target Weight (kg)</Text>
-          <TextInput value={targetWeight} onChangeText={setTargetWeight} placeholder="Enter your target weight" keyboardType="numeric" style={styles.input} />
+          <Text style={styles.fieldLabel}>{t("settings.targetWeight")}</Text>
+          <TextInput value={targetWeight} onChangeText={setTargetWeight} placeholder={t("settings.targetWeight")} keyboardType="numeric" style={styles.input} />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Per-Day Limits</Text>
-          <Text style={styles.hint}>Set nutrition targets for each day of the week. Select a day to edit its limits.</Text>
+          <Text style={styles.sectionTitle}>{t("settings.language")}</Text>
+          <Text style={styles.fieldLabel}>{t("language.selectLanguage")}</Text>
+          {Platform.OS === "ios" ? (
+            <View style={{ borderWidth: 1, borderColor: "#d1fae5", borderRadius: 12, overflow: "hidden" }}>
+              <Picker
+                selectedValue={language}
+                onValueChange={(lang) => setLanguage(lang as Language)}
+                style={{ height: 200 }}
+              >
+                <Picker.Item label={t("language.english")} value="en" />
+                <Picker.Item label={t("language.hungarian")} value="hu" />
+              </Picker>
+            </View>
+          ) : (
+            <Picker
+              selectedValue={language}
+              onValueChange={(lang) => setLanguage(lang as Language)}
+              style={styles.input}
+            >
+              <Picker.Item label={t("language.english")} value="en" />
+              <Picker.Item label={t("language.hungarian")} value="hu" />
+            </Picker>
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t("settings.perDayLimits")}</Text>
+          <Text style={styles.hint}>{t("settings.hint")}</Text>
           <View style={styles.dayRow}>
             {DAYS_OF_WEEK.map((day) => (
               <Pressable key={day} onPress={() => setSelectedDay(day)} style={[styles.dayChip, selectedDay === day && styles.dayChipActive]}>
@@ -191,28 +221,36 @@ export default function SettingsScreen() {
 
           {dayData ? (
             <>
-              <Text style={styles.subLabel}>📊 Daily Totals — {selectedDay}</Text>
-              <Text style={styles.hint}>Total daily targets. Used for calendar colour coding (green / yellow / red) and Quick Fill goal.</Text>
+              <Text style={styles.subLabel}>📊 {t("settings.dailyTotals")} — {selectedDay}</Text>
+              <Text style={styles.hint}>{t("settings.hint")}</Text>
               <View style={styles.macroRow}>
-                <MacroInput label="Cal" value={dayData.overall.calories} onChange={(v) => updateDayOverall("calories", v)} />
-                <MacroInput label="Protein g" value={dayData.overall.protein} onChange={(v) => updateDayOverall("protein", v)} />
-                <MacroInput label="Carbs g" value={dayData.overall.carbs} onChange={(v) => updateDayOverall("carbs", v)} />
-                <MacroInput label="Fats g" value={dayData.overall.fats} onChange={(v) => updateDayOverall("fats", v)} />
+                <MacroInput label={t("settings.calories")} value={dayData.overall.calories} onChange={(v) => updateDayOverall("calories", v)} />
+                <MacroInput label={t("settings.protein")} value={dayData.overall.protein} onChange={(v) => updateDayOverall("protein", v)} />
+                <MacroInput label={t("settings.carbs")} value={dayData.overall.carbs} onChange={(v) => updateDayOverall("carbs", v)} />
+                <MacroInput label={t("settings.fats")} value={dayData.overall.fats} onChange={(v) => updateDayOverall("fats", v)} />
               </View>
 
-              <Text style={styles.subLabel}>🍽 Per-Meal Targets</Text>
-              <Text style={styles.hint}>Meal-specific limits for diary progress bars and Quick Fill distribution across meals.</Text>
-              {(["breakfast", "lunch", "dinner", "snacks"] as const).map((meal) => (
-                <View key={meal} style={styles.mealSection}>
-                  <Text style={styles.mealLabel}>{meal[0].toUpperCase() + meal.slice(1)}</Text>
-                  <View style={styles.macroRow}>
-                    <MacroInput label="Cal" value={dayData.meals[meal].calories} onChange={(v) => updateMealMacro(meal, "calories", v)} />
-                    <MacroInput label="Protein g" value={dayData.meals[meal].protein} onChange={(v) => updateMealMacro(meal, "protein", v)} />
-                    <MacroInput label="Carbs g" value={dayData.meals[meal].carbs} onChange={(v) => updateMealMacro(meal, "carbs", v)} />
-                    <MacroInput label="Fats g" value={dayData.meals[meal].fats} onChange={(v) => updateMealMacro(meal, "fats", v)} />
+              <Text style={styles.subLabel}>🍽 {t("settings.perMealTargets")}</Text>
+              <Text style={styles.hint}>{t("settings.hint")}</Text>
+              {((["breakfast", "lunch", "dinner", "snacks"] as const).map((meal) => {
+                const mealNameMap: Record<string, string> = {
+                  breakfast: t("meal.breakfast"),
+                  lunch: t("meal.lunch"),
+                  dinner: t("meal.dinner"),
+                  snacks: t("meal.snacks"),
+                };
+                return (
+                  <View key={meal} style={styles.mealSection}>
+                    <Text style={styles.mealLabel}>{mealNameMap[meal]}</Text>
+                    <View style={styles.macroRow}>
+                      <MacroInput label={t("settings.calories")} value={dayData.meals[meal].calories} onChange={(v) => updateMealMacro(meal, "calories", v)} />
+                      <MacroInput label={t("settings.protein")} value={dayData.meals[meal].protein} onChange={(v) => updateMealMacro(meal, "protein", v)} />
+                      <MacroInput label={t("settings.carbs")} value={dayData.meals[meal].carbs} onChange={(v) => updateMealMacro(meal, "carbs", v)} />
+                      <MacroInput label={t("settings.fats")} value={dayData.meals[meal].fats} onChange={(v) => updateMealMacro(meal, "fats", v)} />
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              }))}
             </>
           ) : null}
         </View>
@@ -229,16 +267,16 @@ export default function SettingsScreen() {
         >
           {saveMutation.isPending
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.saveButtonText}>Save Settings</Text>}
+            : <Text style={styles.saveButtonText}>{t("settings.save")}</Text>}
         </Pressable>
 
         <Pressable
           onPress={signOut}
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
+          accessibilityLabel={t("common.signOut")}
           style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}
         >
-          <Text style={styles.signOutButtonText}>Sign out</Text>
+          <Text style={styles.signOutButtonText}>{t("common.signOut")}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

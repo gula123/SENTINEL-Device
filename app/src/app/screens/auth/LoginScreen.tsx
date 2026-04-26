@@ -9,6 +9,7 @@ import { getMobileSessionMetadata } from "../../services/auth/deviceSession";
 import { configureNativeGoogleSignIn, getNativeGoogleSignIn } from "../../services/auth/nativeGoogleSession";
 import { loginWithGoogleToken } from "../../services/auth/authApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -19,6 +20,7 @@ if (Platform.OS === "web") console.log("[Auth] Redirect URI:", WEB_REDIRECT_URI)
 
 export default function LoginScreen() {
   const { saveSession } = useAuth();
+  const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -96,13 +98,13 @@ export default function LoginScreen() {
   const handlePress = async () => {
     setError(null);
     if (Platform.OS === "web") {
-      promptAsync().catch((err: any) => setError(err?.message ?? "Sign-in failed"));
+      promptAsync().catch((err: any) => setError(err?.message ?? t("login.failed")));
       return;
     }
     configureNativeGoogleSignIn();
     const nativeGoogleSignIn = getNativeGoogleSignIn();
     if (!nativeGoogleSignIn) {
-      setError("Google Sign-In is unavailable on this platform");
+      setError(t("login.error"));
       return;
     }
 
@@ -129,8 +131,8 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>GURUL Mobile</Text>
-        <Text style={styles.subtitle}>Sign in with Google to continue.</Text>
+        <Text style={styles.title}>{t("login.title")}</Text>
+        <Text style={styles.subtitle}>{t("login.signInPrompt")}</Text>
         <Pressable
           onPress={handlePress}
           disabled={loading || (Platform.OS === "web" && !request)}
@@ -138,7 +140,7 @@ export default function LoginScreen() {
         >
           {loading
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.buttonText}>Continue with Google</Text>}
+            : <Text style={styles.buttonText}>{t("login.signInButton")}</Text>}
         </Pressable>
         {error && <Text style={styles.error}>{error}</Text>}
       </View>

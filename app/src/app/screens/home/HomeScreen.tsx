@@ -15,6 +15,8 @@ import { type FoodLogDto, type MealType } from "../../services/food/foodLogsApi"
 import { applyQuickFillDay } from "../../services/quickfill/quickFillService";
 import { resolveDayLimits } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
+import { getMealLabel } from "../../utils/i18n";
 
 const MEAL_ORDER: MealType[] = ["BREAKFAST", "LUNCH", "DINNER", "SNACKS"];
 const MEAL_LABEL: Record<MealType, string> = { BREAKFAST: "Breakfast", LUNCH: "Lunch", DINNER: "Dinner", SNACKS: "Snacks" };
@@ -49,12 +51,13 @@ function MacroCard({ label, value, limit, invertColorByLimit = false }: { label:
   );
 }
 
-function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
+function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel }: {
   meal: MealType;
   items: FoodLogDto[];
   limits: { proteinLimit: number; carbsLimit: number; fatsLimit: number } | null;
   calLimit?: number;
   onLogPress?: () => void;
+  mealLabel: string;
 }) {
   const totalCal = items.reduce((s, i) => s + (i.calories || 0), 0);
   const totalProtein = Math.round(items.reduce((s, i) => s + (i.protein || 0), 0));
@@ -76,11 +79,11 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress }: {
     <Pressable
       onPress={onLogPress}
       style={({ pressed }) => [styles.mealCard, pressed && styles.mealCardPressed]}
-      accessibilityLabel={`Log food for ${MEAL_LABEL[meal]}`}
+      accessibilityLabel={`Log food for ${mealLabel}`}
     >
       <View style={styles.mealHeader}>
         <Text style={styles.mealIcon}>{MEAL_ICON[meal]}</Text>
-        <Text style={styles.mealName}>{MEAL_LABEL[meal]}</Text>
+        <Text style={styles.mealName}>{mealLabel}</Text>
         <View style={styles.mealCalBlock}>
           <Text style={[styles.mealCal, { color: calColor }]}>
             {hasCalorieLimit ? `${calLimit} / ${Math.round(totalCal)}` : `${Math.round(totalCal)}`} kcal
@@ -153,6 +156,8 @@ function DayView({
   navigation,
   token,
   signOut,
+  language,
+  t,
 }: {
   date: string;
   width: number;
@@ -160,7 +165,9 @@ function DayView({
   shouldFetch: boolean;
   navigation: NativeStackNavigationProp<MainStackParamList>;
   token: string | null;
-  signOut: () => void;
+  signOut: () => Promise<void>;
+  language: any;
+  t: (key: string) => string;
 }) {
   const queryClient = useQueryClient();
   const [showFillOptions, setShowFillOptions] = useState(false);
@@ -382,6 +389,7 @@ function DayView({
                 } : null}
                 calLimit={dayLimits.mealCalories[meal]}
                 onLogPress={() => navigation.navigate("LogFood", { meal, date })}
+                mealLabel={getMealLabel(meal, language)}
               />
             ))
           )}
@@ -394,6 +402,7 @@ function DayView({
 // ─── Shell: fixed header + FlatList infinite day pager ───
 export default function HomeScreen() {
   const { user, signOut, token } = useAuth();
+  const { language, t } = useLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<RouteProp<MainTabParamList, "Diary">>();
   const { width } = useWindowDimensions();
@@ -496,6 +505,8 @@ export default function HomeScreen() {
             navigation={navigation}
             token={token}
             signOut={signOut}
+            language={language}
+            t={t}
           />
         )}
         horizontal

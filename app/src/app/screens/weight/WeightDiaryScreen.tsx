@@ -16,9 +16,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
 import { useWeightDiary } from "../../hooks/useWeightDiary";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 export default function WeightDiaryScreen() {
   const { signOut } = useAuth();
+  const { t } = useLanguage();
   const { todayQuery, historyQuery, statsQuery, saveWeightMutation } = useWeightDiary();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -262,27 +264,27 @@ export default function WeightDiaryScreen() {
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.pageTitle}>Weight Diary</Text>
+        <Text style={s.pageTitle}>{t("weight.title")}</Text>
 
         {isAuthExpired ? (
           <View style={s.errorBox}>
-            <Text style={s.errorTitle}>Session expired</Text>
-            <Text style={s.errorText}>Please sign in again.</Text>
+            <Text style={s.errorTitle}>{t("weight.sessionExpired")}</Text>
+            <Text style={s.errorText}>{t("weight.signInAgain")}</Text>
             <Pressable onPress={signOut} style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]}>
-              <Text style={s.primaryBtnText}>Sign in again</Text>
+              <Text style={s.primaryBtnText}>{t("weight.signInButton")}</Text>
             </Pressable>
           </View>
         ) : null}
 
         <View style={s.chartCard}>
-          <Text style={s.chartTitle}>Weight Progress</Text>
+          <Text style={s.chartTitle}>{t("weight.progressChart")}</Text>
           {historyQuery.isLoading ? (
             <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 8 }} />
           ) : weeklyChartData.length === 0 ? (
-            <Text style={s.muted}>No weight data yet.</Text>
+            <Text style={s.muted}>{t("weight.noData")}</Text>
           ) : (
             <>
-              <Text style={s.chartSub}>Last 12 months (weekly points)</Text>
+              <Text style={s.chartSub}>{t("weight.chartSubtitle")}</Text>
               <View style={s.chartBox}>
                 <LineChart
                   data={{
@@ -337,33 +339,33 @@ export default function WeightDiaryScreen() {
         </View>
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Statistics</Text>
+          <Text style={s.cardTitle}>{t("weight.statistics")}</Text>
           {statsQuery.isLoading ? (
             <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 8 }} />
           ) : (
             <View style={s.statsGrid}>
               <View style={s.statTile}>
-                <Text style={s.statLabel}>Total Lost</Text>
+                <Text style={s.statLabel}>{t("weight.totalLost")}</Text>
                 <Text style={[s.statValue, { color: "#16a34a" }]}>{stats?.totalWeightLost?.toFixed(1) || "0.0"} kg</Text>
               </View>
               <View style={s.statTile}>
-                <Text style={s.statLabel}>Avg / Month</Text>
+                <Text style={s.statLabel}>{t("weight.avgPerMonth")}</Text>
                 <Text style={[s.statValue, { color: "#0284c7" }]}>{stats?.averageMonthlyLoss?.toFixed(2) || "0.00"} kg</Text>
               </View>
               <View style={s.statTile}>
-                <Text style={s.statLabel}>Target</Text>
-                <Text style={[s.statValue, { color: "#7c3aed" }]}>{stats?.targetWeight != null ? `${stats.targetWeight.toFixed(1)} kg` : "Not set"}</Text>
+                <Text style={s.statLabel}>{t("weight.target")}</Text>
+                <Text style={[s.statValue, { color: "#7c3aed" }]}>{stats?.targetWeight != null ? `${stats.targetWeight.toFixed(1)} kg` : t("weight.notSet")}</Text>
               </View>
               <View style={s.statTile}>
-                <Text style={s.statLabel}>ETA</Text>
-                <Text style={[s.statValue, { color: "#ea580c" }]} numberOfLines={1}>{stats?.estimatedTargetDate || "N/A"}</Text>
+                <Text style={s.statLabel}>{t("weight.eta")}</Text>
+                <Text style={[s.statValue, { color: "#ea580c" }]} numberOfLines={1}>{stats?.estimatedTargetDate || t("weight.na")}</Text>
               </View>
             </View>
           )}
         </View>
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Today's Weight</Text>
+          <Text style={s.cardTitle}>{t("weight.todaysWeight")}</Text>
           {todayQuery.isLoading && latestKnownWeight == null ? (
             <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 8 }} />
           ) : (

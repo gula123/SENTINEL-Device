@@ -19,6 +19,7 @@ import type { MainTabParamList } from "../../navigation/MainTabs";
 import { useCalendarData } from "../../hooks/useCalendarData";
 import { fetchWeightHistory } from "../../services/weight/weightApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 // ─── 5-tier color system (matches desktop Calendar.tsx) ─────────────────────
 type ColorCategory =
@@ -75,6 +76,7 @@ function MonthPage({
   navigation,
   token,
   signOut,
+  t,
 }: {
   month: dayjs.Dayjs;
   width: number;
@@ -83,6 +85,7 @@ function MonthPage({
   navigation: BottomTabNavigationProp<MainTabParamList, "Progress">;
   token: string | null;
   signOut: () => void;
+  t: (key: string) => string;
 }) {
   const yearMonth = month.format("YYYY-MM");
   const { data, isLoading, isError, error, refetch } = useCalendarData(yearMonth);
@@ -173,7 +176,7 @@ function MonthPage({
       showsVerticalScrollIndicator={false}
       nestedScrollEnabled
     >
-      <Text style={styles.pageTitle}>Calendar</Text>
+      <Text style={styles.pageTitle}>{t("progress.title")}</Text>
 
       <View style={styles.monthCard}>
         <Pressable
@@ -196,24 +199,24 @@ function MonthPage({
       {isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading monthly data…</Text>
+          <Text style={styles.loadingText}>{t("progress.loading")}</Text>
         </View>
       ) : null}
 
       {isError ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>Failed to load progress</Text>
+          <Text style={styles.errorTitle}>{t("progress.loadFailed")}</Text>
           <Text style={styles.errorText}>
-            {isAuthExpired ? "Session expired. Please sign in again." : (error as Error).message}
+            {isAuthExpired ? t("progress.sessionExpired") : (error as Error).message}
           </Text>
           <View style={styles.row}>
             {isAuthExpired ? (
               <Pressable onPress={signOut} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                <Text style={styles.secondaryBtnText}>Sign in again</Text>
+                <Text style={styles.secondaryBtnText}>{t("progress.signInAgain")}</Text>
               </Pressable>
             ) : null}
             <Pressable onPress={() => refetch()} style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
-              <Text style={styles.primaryBtnText}>Retry</Text>
+              <Text style={styles.primaryBtnText}>{t("progress.retry")}</Text>
             </Pressable>
           </View>
         </View>
@@ -231,7 +234,7 @@ function MonthPage({
               <Text style={[styles.statGlyph, { color: "#16a34a" }]}>✓</Text>
               <Text style={styles.statValue}>{stats.green}</Text>
               <View style={[styles.statLabelPill, { backgroundColor: "#dcfce7" }]}> 
-                <Text style={[styles.statLabelText, { color: "#166534" }]}>Green</Text>
+                <Text style={[styles.statLabelText, { color: "#166534" }]}>{t("progress.green")}</Text>
               </View>
               <Text style={styles.statRange}>≤108%</Text>
             </View>
@@ -240,7 +243,7 @@ function MonthPage({
               <Text style={[styles.statGlyph, { color: "#d97706" }]}>!</Text>
               <Text style={styles.statValue}>{stats.yellow}</Text>
               <View style={[styles.statLabelPill, { backgroundColor: "#fef9c3" }]}> 
-                <Text style={[styles.statLabelText, { color: "#854d0e" }]}>Yellow</Text>
+                <Text style={[styles.statLabelText, { color: "#854d0e" }]}>{t("progress.yellow")}</Text>
               </View>
               <Text style={styles.statRange}>108–115%</Text>
             </View>
@@ -249,7 +252,7 @@ function MonthPage({
               <Text style={[styles.statGlyph, { color: "#ea580c" }]}>!</Text>
               <Text style={styles.statValue}>{stats.orange}</Text>
               <View style={[styles.statLabelPill, { backgroundColor: "#ffedd5" }]}> 
-                <Text style={[styles.statLabelText, { color: "#9a3412" }]}>Orange</Text>
+                <Text style={[styles.statLabelText, { color: "#9a3412" }]}>{t("progress.orange")}</Text>
               </View>
               <Text style={styles.statRange}>115–125%</Text>
             </View>
@@ -258,7 +261,7 @@ function MonthPage({
               <Text style={[styles.statGlyph, { color: "#dc2626" }]}>✕</Text>
               <Text style={styles.statValue}>{stats.red}</Text>
               <View style={[styles.statLabelPill, { backgroundColor: "#fee2e2" }]}> 
-                <Text style={[styles.statLabelText, { color: "#991b1b" }]}>Red</Text>
+                <Text style={[styles.statLabelText, { color: "#991b1b" }]}>{t("progress.red")}</Text>
               </View>
               <Text style={styles.statRange}>{">125%"}</Text>
             </View>
@@ -339,6 +342,7 @@ export default function ProgressScreen() {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
 
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList, "Progress">>();
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 });
@@ -389,6 +393,7 @@ export default function ProgressScreen() {
               navigation={navigation}
               token={token}
               signOut={signOut}
+              t={t}
             />
           );
         }}
