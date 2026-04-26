@@ -31,7 +31,7 @@ EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<ios client id or empty for now>
 ```
 
 ## Android client details you may need
-- Android package name for dev build: choose one and keep it stable, for example `com.sentinel.mobile`.
+- Android package name for dev build: choose one and keep it stable, for example `com.gurul.mobile`.
 - SHA-1 fingerprint for debug keystore (Windows):
 
 ```powershell
@@ -40,7 +40,7 @@ keytool -list -v -keystore "$env:USERPROFILE\.android\debug.keystore" -alias and
 
 ## Restart app after env update
 ```powershell
-cd "e:\Code\SENTINEL\SENTINEL-Device\app"
+cd "e:\Code\GURUL\GURUL-Device\app"
 npx expo start -c --android
 ```
 

@@ -2,7 +2,7 @@
 
 ## 1) Start backend (terminal 1)
 ```powershell
-cd "e:\Code\SENTINEL\SENTINEL-Backend"
+cd "e:\Code\GURUL\GURUL-Backend"
 $env:SPRING_PROFILES_ACTIVE="local"
 ./mvnw spring-boot:run
 ```
@@ -29,7 +29,7 @@ $adb = "C:\Users\gulac\AppData\Local\Android\Sdk\platform-tools\adb.exe"
 
 ## 4) For Android (terminal 4)
 ```powershell
-cd "e:\Code\SENTINEL\SENTINEL-Device\app"
+cd "e:\Code\GURUL\GURUL-Device\app"
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 $env:ANDROID_HOME = "C:\Users\gulac\AppData\Local\Android\Sdk"
 $env:ANDROID_SDK_ROOT = "C:\Users\gulac\AppData\Local\Android\Sdk"
@@ -38,6 +38,6 @@ npx expo run:android
 
 ## 5) For Web
 ```
-cd "e:\Code\SENTINEL\SENTINEL-Device\app"
+cd "e:\Code\GURUL\GURUL-Device\app"
 npx expo start --web
 ```

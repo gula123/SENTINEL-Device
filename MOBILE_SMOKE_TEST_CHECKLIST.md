@@ -1,4 +1,4 @@
-# SENTINEL Mobile Smoke Test Checklist
+# GURUL Mobile Smoke Test Checklist
 
 Last updated: 2026-03-09
 

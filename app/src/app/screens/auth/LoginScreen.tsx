@@ -129,7 +129,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>SENTINEL Mobile</Text>
+        <Text style={styles.title}>GURUL Mobile</Text>
         <Text style={styles.subtitle}>Sign in with Google to continue.</Text>
         <Pressable
           onPress={handlePress}

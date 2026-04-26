@@ -1,14 +1,14 @@
-# SENTINEL Mobile App Plan (Expo)
+# GURUL Mobile App Plan (Expo)
 
 Last updated: 2026-03-08
-Owner: SENTINEL team
+Owner: GURUL team
 Status: Approved for implementation
 
 ## 1) Decisions Locked In
 
 - Platform: React Native with Expo (TypeScript)
 - Scope target: Android + iOS from one codebase
-- Backend: Reuse existing SENTINEL backend APIs
+- Backend: Reuse existing GURUL backend APIs
 - V1 includes: Vacation Day + Quick Fill
 - Auth: Google login only (no email/password in V1)
 - Data behavior: Basic cache and resilient logging flow in mobile app
@@ -201,7 +201,7 @@ Deliverable:
   - Google-only login
   - Basic cache logging
 - 2026-03-08: Phase 0 foundation started:
-  - Expo TypeScript app scaffolded under SENTINEL-Device/app
+  - Expo TypeScript app scaffolded under GURUL-Device/app
   - Core dependencies added (navigation, react-query, secure-store, dayjs)
   - Auth-gated root navigation and Yazio-style tab shell created
   - API config/client + secure token storage + auth context bootstrapped

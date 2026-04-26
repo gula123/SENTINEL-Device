@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Set-Location "e:\Code\SENTINEL\SENTINEL-Device\app"
+Set-Location "e:\Code\GURUL\GURUL-Device\app"
 
 $adb = Get-Command adb -ErrorAction SilentlyContinue
 if (-not $adb) {
