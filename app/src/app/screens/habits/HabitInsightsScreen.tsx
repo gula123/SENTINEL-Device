@@ -8,6 +8,8 @@ import {
   Alert,
   FlatList,
   Modal,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -211,23 +213,22 @@ function InsightStat({ label, value }: { label: string; value: number }) {
 function HabitCalendarMonthPage({
   token,
   habitId,
-  import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    NativeSyntheticEvent,
-    NativeScrollEvent,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
-  } from "react-native";
+  month,
+  pageWidth,
+  onPrevMonth,
+  onNextMonth,
+  onDayTap,
+}: {
+  token: string | null;
+  habitId: number;
+  month: dayjs.Dayjs;
+  pageWidth: number;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onDayTap: (date: string, currentValue?: boolean) => void;
+}) {
+  const { t } = useLanguage();
+
   const calendarQuery = useQuery({
     queryKey: ["habitCalendar", habitId, month.format("YYYY-MM")],
     queryFn: async () => {
@@ -462,7 +463,7 @@ export default function HabitInsightsScreen() {
 
   // Debounce handler for day taps - optimistic UI updates immediately, backend call debounced
   const debouncedLogRef = useRef<{ date: string; currentValue?: boolean } | null>(null);
-  const debouncedLogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedLogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDayTap = useCallback(
     (date: string, currentValue?: boolean) => {
