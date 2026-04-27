@@ -41,6 +41,7 @@ import {
 } from "../../services/food/foodLogsApi";
 import { resolvePerDayLimitsForEdit } from "../../services/settings/userSettingsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 const MEAL_LABEL: Record<MealType, string> = {
   BREAKFAST: "Breakfast",
@@ -107,6 +108,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const [aiNote, setAiNote] = useState("");
 
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
   const updateMutation = useUpdateFoodLog(date);
@@ -502,7 +504,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     if (!editingLog) return;
     const g = Number(editingGrams);
     if (!Number.isFinite(g) || g <= 0) {
-      Alert.alert("Invalid grams", "Enter a positive number.");
+      Alert.alert(t("logFood.invalidGrams"), t("logFood.positiveNumber"));
       return;
     }
 
@@ -510,7 +512,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       await updateMutation.mutateAsync({ logId: editingLog.id, grams: g });
       invalidate();
       onCancelEditLog();
-      showToast("Food grams updated.");
+      showToast(t("logFood.gramsUpdated"));
     } catch (err) {
       handleError(err);
     }
@@ -521,7 +523,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
       await deleteMutation.mutateAsync(logId);
       invalidate();
       onCancelEditLog();
-      showToast("Food removed from this meal.");
+      showToast(t("logFood.foodRemoved"));
     } catch (err) {
       handleError(err);
     }
@@ -538,8 +540,8 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     }
 
     Alert.alert(
-      "Delete food",
-      `Delete ${logToDelete.foodName} from this meal?`,
+      t("logFood.deleteFood"),
+      `${t("logFood.deleteConfirm")} ${logToDelete.foodName}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -617,7 +619,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>{MEAL_LABEL[meal]} statistics</Text>
+            <Text style={s.headerText}>{t(`home.${meal.toLowerCase()}`)} {t("logFood.statisticsSuffix")}</Text>
           </View>
           <Text style={s.headerDate}>{dayjs(date).format("MMM D")}</Text>
         </View>
@@ -625,42 +627,42 @@ export default function LogFoodScreen({ route, navigation }: Props) {
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
           <View style={s.card}>
-            <Text style={s.cardTitle}>Meal Statistics</Text>
-            <Text style={s.mealHint}>Consumed / Limit</Text>
+            <Text style={s.cardTitle}>{t("logFood.cardTitle")}</Text>
+            <Text style={s.mealHint}>{t("logFood.consumedLimit")}</Text>
             <View style={s.metricsGrid}>
               <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Calories</Text>
+                <Text style={s.metricLabel}>{t("logFood.calories")}</Text>
                 <Text style={[s.metricValue, { color: mealSummaryColors.calories }]}>{Math.round(consumed.calories)} / {Math.round(mealLimits.calories)}</Text>
               </View>
               <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Protein</Text>
+                <Text style={s.metricLabel}>{t("logFood.protein")}</Text>
                 <Text style={[s.metricValue, { color: mealSummaryColors.protein }]}>{Math.round(consumed.protein * 10) / 10}g / {Math.round(mealLimits.protein * 10) / 10}g</Text>
               </View>
               <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Carbs</Text>
+                <Text style={s.metricLabel}>{t("logFood.carbs")}</Text>
                 <Text style={[s.metricValue, { color: mealSummaryColors.carbs }]}>{Math.round(consumed.carbs * 10) / 10}g / {Math.round(mealLimits.carbs * 10) / 10}g</Text>
               </View>
               <View style={s.metricBoxCompact}>
-                <Text style={s.metricLabel}>Fats</Text>
+                <Text style={s.metricLabel}>{t("logFood.fats")}</Text>
                 <Text style={[s.metricValue, { color: mealSummaryColors.fats }]}>{Math.round(consumed.fats * 10) / 10}g / {Math.round(mealLimits.fats * 10) / 10}g</Text>
               </View>
             </View>
           </View>
 
           <View style={s.card}>
-            <Text style={s.cardTitle}>Add Food</Text>
+            <Text style={s.cardTitle}>{t("logFood.addFood")}</Text>
             <Pressable
               onPress={() => navigation.navigate("AddFood", { meal, date })}
               style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`Add food for ${MEAL_LABEL[meal]}`}
+              accessibilityLabel={`${t("logFood.addFood")} ${t(`home.${meal.toLowerCase()}`)}`}
             >
-              <Text style={s.addBtnText}>Add Food</Text>
+              <Text style={s.addBtnText}>{t("logFood.addFood")}</Text>
             </Pressable>
           </View>
 
           <View style={s.card}>
-            <Text style={s.cardTitle}>Already Added Foods</Text>
+            <Text style={s.cardTitle}>{t("logFood.alreadyAdded")}</Text>
 
             {logsQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
 
@@ -690,7 +692,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                               value={editingGrams}
                               onChangeText={setEditingGrams}
                               keyboardType="numeric"
-                              placeholder="New grams"
+                              placeholder={t("logFood.newGramsPlaceholder")}
                               placeholderTextColor="#9ca3af"
                               style={[s.input, s.gramsInput]}
                               returnKeyType="done"
@@ -699,7 +701,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
                           {editingPreview ? (
                             <View style={s.previewBox}>
-                              <Text style={s.previewTitle}>After update ({editingPreview.grams}g)</Text>
+                              <Text style={s.previewTitle}>{t("logFood.afterUpdate").replace("{grams}", String(editingPreview.grams))}</Text>
                               <View style={s.previewRow}>
                                 <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.calories ?? "#374151" }]}>🔥 {editingPreview.calories} kcal</Text>
                                 <Text style={[s.previewItem, { color: editingPreviewTotals?.colors.protein ?? "#374151" }]}>🥩 {editingPreview.protein}g P</Text>
@@ -719,7 +721,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                                 pressed && s.pressed,
                               ]}
                             >
-                              <Text style={s.deleteBtnText}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</Text>
+                              <Text style={s.deleteBtnText}>{deleteMutation.isPending ? t("logFood.deleting") : t("logFood.delete")}</Text>
                             </Pressable>
                             <Pressable
                               onPress={onCancelEditLog}
@@ -732,7 +734,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                               disabled={updateMutation.isPending || deleteMutation.isPending}
                               style={({ pressed }) => [s.addBtn, updateMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
                             >
-                              <Text style={s.addBtnText}>{updateMutation.isPending ? "Saving…" : "Save"}</Text>
+                              <Text style={s.addBtnText}>{updateMutation.isPending ? t("logFood.saving") : t("logFood.save")}</Text>
                             </Pressable>
                           </View>
                         </View>
@@ -742,7 +744,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                 })}
               </View>
             ) : (
-              <Text style={s.emptyMealText}>No foods added to this meal yet.</Text>
+              <Text style={s.emptyMealText}>{t("logFood.noFoods")}</Text>
             )}
           </View>
 
@@ -752,10 +754,10 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Done with meal statistics"
+            accessibilityLabel={t("logFood.done")}
             style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Done</Text>
+            <Text style={s.doneBtnText}>{t("logFood.done")}</Text>
           </Pressable>
         </View>
 

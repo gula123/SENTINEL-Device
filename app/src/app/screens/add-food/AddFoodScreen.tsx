@@ -8,6 +8,7 @@ import { useFrequentFoods } from "../../hooks/useFrequentFoods";
 import { FrequentFoodsSection } from "../../components/FrequentFoodsSection";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 import { useCallback, useRef, useState } from "react";
 import { Animated, Alert } from "react-native";
 import { fetchFoodPortions, type FoodItem } from "../../services/food/foodLogsApi";
@@ -31,6 +32,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
   const frequentFoodsQuery = useFrequentFoods(100, { enabled: false });
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const addMutation = useAddFoodLog(date);
 
   useFocusEffect(
@@ -98,7 +100,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>Add Food - {MEAL_LABEL[meal]}</Text>
+            <Text style={s.headerText}>{t("addFood.title")} - {t(`home.${meal.toLowerCase()}`)}</Text>
           </View>
         </View>
 
@@ -110,9 +112,9 @@ export default function AddFoodScreen({ route, navigation }: Props) {
             >
               <Text style={s.actionBtnIcon}>🔍</Text>
               <View style={s.actionBtnContent}>
-                <Text style={s.actionBtnTitle}>Search Food</Text>
+                <Text style={s.actionBtnTitle}>{t("addFood.searchFood")}</Text>
                 <Text style={s.actionBtnSubtitle} numberOfLines={1}>
-                  Find and log any food
+                  {t("addFood.searchSubtitle")}
                 </Text>
               </View>
             </Pressable>
@@ -123,9 +125,9 @@ export default function AddFoodScreen({ route, navigation }: Props) {
             >
               <Text style={s.actionBtnIcon}>➕</Text>
               <View style={s.actionBtnContent}>
-                <Text style={s.actionBtnTitle}>Create New Food</Text>
+                <Text style={s.actionBtnTitle}>{t("addFood.createFood")}</Text>
                 <Text style={s.actionBtnSubtitle} numberOfLines={1}>
-                  Add a custom food entry
+                  {t("addFood.createSubtitle")}
                 </Text>
               </View>
             </Pressable>
@@ -145,10 +147,10 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Back to meal statistics"
+            accessibilityLabel={t("addFood.backToMeal")}
             style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Back to Meal Statistics</Text>
+            <Text style={s.doneBtnText}>{t("addFood.backToMeal")}</Text>
           </Pressable>
         </View>
 

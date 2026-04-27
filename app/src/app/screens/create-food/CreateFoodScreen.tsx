@@ -24,6 +24,7 @@ import {
   type MealType,
 } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 const MEAL_LABEL: Record<MealType, string> = {
   BREAKFAST: "Breakfast",
@@ -53,6 +54,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
   const [aiNote, setAiNote] = useState("");
 
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
 
@@ -147,7 +149,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
 
   const onAiEstimate = async () => {
     if (!customName.trim()) {
-      Alert.alert("Enter a food name first.");
+      Alert.alert(t("createFood.enterFoodNameFirst"));
       return;
     }
     try {
@@ -166,87 +168,87 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>Create Food</Text>
+            <Text style={s.headerText}>{t("createFood.title")}</Text>
           </View>
-          <Text style={s.headerDate}>{MEAL_LABEL[meal]}</Text>
+          <Text style={s.headerDate}>{t(`home.${meal.toLowerCase()}`)}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
-            <Text style={s.cardTitle}>Create New Food (per 100g)</Text>
-            <Text style={s.helperText}>Enter nutrition values per 100g for the new food, then set log grams for what you ate now.</Text>
+            <Text style={s.cardTitle}>{t("createFood.cardTitle")}</Text>
+            <Text style={s.helperText}>{t("createFood.helpText")}</Text>
 
-            <Text style={s.inputLabel}>Food name</Text>
+            <Text style={s.inputLabel}>{t("createFood.foodName")}</Text>
             <TextInput
               value={customName}
               onChangeText={setCustomName}
-              placeholder="Food name"
+              placeholder={t("createFood.foodName")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>Brand or place</Text>
+            <Text style={s.inputLabel}>{t("createFood.brandOrPlace")}</Text>
             <TextInput
               value={customBrandOrPlace}
               onChangeText={setCustomBrandOrPlace}
-              placeholder="Brand or place"
+              placeholder={t("createFood.brandOrPlace")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
 
             <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
-              <Text style={s.aiBtnText}>{aiMutation.isPending ? "Estimating..." : "AI Estimate"}</Text>
+              <Text style={s.aiBtnText}>{aiMutation.isPending ? t("createFood.estimating") : t("createFood.aiEstimate")}</Text>
             </Pressable>
             {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
 
-            <Text style={s.inputLabel}>Calories (per 100g)</Text>
+            <Text style={s.inputLabel}>{t("createFood.caloriesLabel")}</Text>
             <TextInput
               value={customCalories}
               onChangeText={setCustomCalories}
               keyboardType="numeric"
-              placeholder="Calories / 100g"
+              placeholder={t("createFood.caloriesPlaceholder")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>Protein (g per 100g)</Text>
+            <Text style={s.inputLabel}>{t("createFood.proteinLabel")}</Text>
             <TextInput
               value={customProtein}
               onChangeText={setCustomProtein}
               keyboardType="numeric"
-              placeholder="Protein g / 100g"
+              placeholder={t("createFood.proteinPlaceholder")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>Carbs (g per 100g)</Text>
+            <Text style={s.inputLabel}>{t("createFood.carbsLabel")}</Text>
             <TextInput
               value={customCarbs}
               onChangeText={setCustomCarbs}
               keyboardType="numeric"
-              placeholder="Carbs g / 100g"
+              placeholder={t("createFood.carbsPlaceholder")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>Fats (g per 100g)</Text>
+            <Text style={s.inputLabel}>{t("createFood.fatsLabel")}</Text>
             <TextInput
               value={customFats}
               onChangeText={setCustomFats}
               keyboardType="numeric"
-              placeholder="Fats g / 100g"
+              placeholder={t("createFood.fatsPlaceholder")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>Eaten grams</Text>
+            <Text style={s.inputLabel}>{t("createFood.eatenGrams")}</Text>
             <TextInput
               value={customGrams}
               onChangeText={setCustomGrams}
               keyboardType="numeric"
-              placeholder="Log grams"
+              placeholder={t("createFood.logGramsPlaceholder")}
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
 
             {customFoodPreview ? (
               <View style={s.previewBox}>
-                <Text style={s.previewTitle}>Will be logged ({customFoodPreview.grams}g)</Text>
+                <Text style={s.previewTitle}>{t("createFood.willBeLogged").replace("{grams}", String(customFoodPreview.grams))}</Text>
                 <View style={s.previewRow}>
                   <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
                   <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
@@ -261,7 +263,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               disabled={createCustomMutation.isPending}
               style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
             >
-              <Text style={s.addBtnText}>{createCustomMutation.isPending ? "Saving..." : "Create & Log"}</Text>
+              <Text style={s.addBtnText}>{createCustomMutation.isPending ? t("createFood.saving") : t("createFood.createAndLog")}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -270,10 +272,10 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Back to add food"
+            accessibilityLabel={t("createFood.backToAddFood")}
             style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Back to Add Food</Text>
+            <Text style={s.doneBtnText}>{t("createFood.backToAddFood")}</Text>
           </Pressable>
         </View>
 

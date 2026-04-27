@@ -29,12 +29,13 @@ import {
   type MealType,
 } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 const MEAL_LABEL: Record<MealType, string> = {
-  BREAKFAST: "Breakfast",
-  LUNCH: "Lunch",
-  DINNER: "Dinner",
-  SNACKS: "Snacks",
+  BREAKFAST: "BREAKFAST",
+  LUNCH: "LUNCH",
+  DINNER: "DINNER",
+  SNACKS: "SNACKS",
 };
 const MEAL_ICON: Record<MealType, string> = {
   BREAKFAST: "☀️",
@@ -63,6 +64,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
 
@@ -180,7 +182,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
         }
       } catch (err) {
         if (!cancelled) {
-          Alert.alert("Search failed", err instanceof Error ? err.message : "Try again");
+          Alert.alert(t("searchFood.searchFailed"), err instanceof Error ? err.message : t("searchFood.tryAgain"));
         }
       } finally {
         if (!cancelled) {
@@ -214,11 +216,11 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const onAdd = async () => {
     const g = resolvedGrams;
     if (!selectedFood) {
-      Alert.alert("Select a food", "Search and tap a result first.");
+      Alert.alert(t("searchFood.selectFood"), t("searchFood.searchFirst"));
       return;
     }
     if (!Number.isFinite(g) || g <= 0) {
-      Alert.alert("Invalid grams", "Enter a positive number.");
+      Alert.alert(t("searchFood.invalidGrams"), t("searchFood.positiveNumber"));
       return;
     }
     try {
@@ -237,7 +239,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       setSelectedPortionId(null);
       setPortionAmount("1");
       setGrams("100");
-      showToast(`Added to ${MEAL_LABEL[meal]}`);
+      showToast(`${t("searchFood.addedTo")} ${t(`home.${meal.toLowerCase()}`)}`);
     } catch (err) {
       handleError(err);
     }
@@ -291,18 +293,18 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
 
   const onCreatePortionForFood = async () => {
     if (!token || !selectedFood) {
-      Alert.alert("Select a food first");
+      Alert.alert(t("searchFood.selectFoodFirst"));
       return;
     }
 
     if (!newPortionTypeCode) {
-      Alert.alert("Choose portion type", "Please select a portion type.");
+      Alert.alert(t("searchFood.choosePortionType"), t("searchFood.selectPortionType"));
       return;
     }
 
     const gramsValue = Number(newPortionGrams);
     if (!Number.isFinite(gramsValue) || gramsValue <= 0) {
-      Alert.alert("Invalid grams", "Enter a positive number.");
+      Alert.alert(t("searchFood.invalidGrams"), t("searchFood.positiveNumber"));
       return;
     }
 
@@ -334,14 +336,14 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>Search Food</Text>
+            <Text style={s.headerText}>{t("searchFood.title")}</Text>
           </View>
-          <Text style={s.headerDate}>{MEAL_LABEL[meal]}</Text>
+          <Text style={s.headerDate}>{t(`home.${meal.toLowerCase()}`)}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
-            <Text style={s.cardTitle}>Search Food</Text>
+            <Text style={s.cardTitle}>{t("searchFood.cardTitle")}</Text>
               {selectedFood ? (
               <View style={s.selectedChip}>
                 <View style={{ flex: 1 }}>
@@ -373,7 +375,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 <TextInput
                   value={query}
                   onChangeText={onSearch}
-                  placeholder="Type at least 2 characters..."
+                  placeholder={t("searchFood.placeholder")}
                   placeholderTextColor="#9ca3af"
                   style={s.input}
                   autoFocus
@@ -437,7 +439,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 value={selectedPortion ? portionAmount : grams}
                 onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
                 keyboardType="numeric"
-                placeholder={selectedPortion ? "Amount" : "Grams"}
+                placeholder={selectedPortion ? t("searchFood.amount") : t("searchFood.grams")}
                 placeholderTextColor="#9ca3af"
                 style={[s.input, s.gramsInput]}
                 returnKeyType="done"
@@ -447,7 +449,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 disabled={addMutation.isPending || !selectedFood}
                 style={({ pressed }) => [s.addBtn, (!selectedFood || addMutation.isPending) && s.addBtnDisabled, pressed && s.pressed]}
               >
-                <Text style={s.addBtnText}>{addMutation.isPending ? "Adding..." : "Add"}</Text>
+                <Text style={s.addBtnText}>{addMutation.isPending ? t("searchFood.adding") : t("searchFood.add")}</Text>
               </Pressable>
               </View>
 
@@ -459,7 +461,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
 
               {selectedFood && portions.length > 0 ? (
               <View style={s.portionWrap}>
-                <Text style={s.portionLabel}>Portions for this food</Text>
+                <Text style={s.portionLabel}>{t("searchFood.portions")}</Text>
                 <View style={s.portionRow}>
                   <Pressable
                     onPress={onSelectGramMode}
@@ -472,7 +474,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     <Text style={[
                       s.portionChipText,
                       selectedPortionId === null && s.portionChipTextActive,
-                    ]}>Grams</Text>
+                    ]}>{t("searchFood.gramChip")}</Text>
                   </Pressable>
                   {portions.map((portion) => (
                     <Pressable
@@ -494,25 +496,25 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     onPress={() => setShowAddPortionForm((v) => !v)}
                     style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
                   >
-                    <Text style={s.portionChipAddText}>+ Add another portion</Text>
+                    <Text style={s.portionChipAddText}>{t("searchFood.addAnotherPortion")}</Text>
                   </Pressable>
                 </View>
               </View>
               ) : selectedFood ? (
               <View style={s.portionWrap}>
-                <Text style={s.portionLabel}>No saved portions yet</Text>
+                <Text style={s.portionLabel}>{t("searchFood.noPortions")}</Text>
                 <Pressable
                   onPress={() => setShowAddPortionForm((v) => !v)}
                   style={({ pressed }) => [s.portionChipAdd, pressed && s.pressed]}
                 >
-                  <Text style={s.portionChipAddText}>+ Add first portion</Text>
+                  <Text style={s.portionChipAddText}>{t("searchFood.addFirstPortion")}</Text>
                 </Pressable>
               </View>
               ) : null}
 
               {selectedFood && showAddPortionForm ? (
               <View style={s.addPortionBox}>
-                <Text style={s.addPortionTitle}>Add portion for {selectedFood.name}</Text>
+                <Text style={s.addPortionTitle}>{t("searchFood.addPortionFor")} {selectedFood.name}</Text>
                 <View style={s.portionRow}>
                   {availablePortionTypes.map((type) => (
                     <Pressable
@@ -534,12 +536,12 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     value={newPortionGrams}
                     onChangeText={setNewPortionGrams}
                     keyboardType="numeric"
-                    placeholder="Grams"
+                    placeholder={t("searchFood.savePortionGrams")}
                     placeholderTextColor="#9ca3af"
                     style={[s.input, s.gramsInput]}
                   />
                   <Pressable onPress={onCreatePortionForFood} style={({ pressed }) => [s.addBtn, pressed && s.pressed]}>
-                    <Text style={s.addBtnText}>Save portion</Text>
+                    <Text style={s.addBtnText}>{t("searchFood.savePortion")}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -551,10 +553,10 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Back to add food"
+            accessibilityLabel={t("searchFood.backToAddFood")}
             style={({ pressed }) => [s.doneBtn, pressed && s.pressed]}
           >
-            <Text style={s.doneBtnText}>Back to Add Food</Text>
+            <Text style={s.doneBtnText}>{t("searchFood.backToAddFood")}</Text>
           </Pressable>
         </View>
 

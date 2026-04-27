@@ -59,6 +59,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
   onLogPress?: () => void;
   mealLabel: string;
 }) {
+  const { t } = useLanguage();
   const totalCal = items.reduce((s, i) => s + (i.calories || 0), 0);
   const totalProtein = Math.round(items.reduce((s, i) => s + (i.protein || 0), 0));
   const totalCarbs   = Math.round(items.reduce((s, i) => s + (i.carbs   || 0), 0));
@@ -97,7 +98,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
       </View>
 
       {items.length === 0 ? (
-        <Text style={styles.mealEmpty}>Nothing logged</Text>
+        <Text style={styles.mealEmpty}>{t("home.nothingLogged")}</Text>
       ) : (
         <>
           {items.map((item) => (
@@ -113,7 +114,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
             <Text style={[styles.mealMacroDot, { backgroundColor: proteinColor }]} />
-            <Text style={styles.mealMacroText}>P {totalProtein}g</Text>
+            <Text style={styles.mealMacroText}>{t("home.abbrProtein")} {totalProtein}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.proteinLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
@@ -123,7 +124,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
             <Text style={[styles.mealMacroDot, { backgroundColor: carbsColor }]} />
-            <Text style={styles.mealMacroText}>C {totalCarbs}g</Text>
+            <Text style={styles.mealMacroText}>{t("home.abbrCarbs")} {totalCarbs}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.carbsLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
@@ -133,7 +134,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
         <View style={styles.mealMacro}>
           <View style={styles.mealMacroLabelRow}>
             <Text style={[styles.mealMacroDot, { backgroundColor: fatsColor }]} />
-            <Text style={styles.mealMacroText}>F {totalFats}g</Text>
+            <Text style={styles.mealMacroText}>{t("home.abbrFats")} {totalFats}g</Text>
             {limits ? <Text style={styles.mealMacroLimit}>/{limits.fatsLimit}g</Text> : null}
           </View>
           <View style={styles.mealMacroTrack}>
@@ -205,24 +206,24 @@ function DayView({
         queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] }),
       ]);
       if (result.skipped) {
-        Alert.alert("Quick Fill", `Already at or above ${Math.round(multiplier * 100)}% target.`);
+        Alert.alert(t("home.quickFillAlertTitle"), t("home.quickFillAtTarget").replace("{pct}", String(Math.round(multiplier * 100))));
       } else {
-        Alert.alert("Quick Fill", `Added ${result.createdEntries} entries.`);
+        Alert.alert(t("home.quickFillAlertTitle"), t("home.quickFillAdded").replace("{count}", String(result.createdEntries)));
       }
     },
     onError: (err: any) => {
       if (err.message === "AUTH_EXPIRED") { signOut(); return; }
-      Alert.alert("Quick Fill failed", err.message ?? "Unknown error");
+      Alert.alert(t("home.quickFillAlertTitle"), t("home.quickFillFailed"));
     },
   });
 
   const handleToggleVacation = async () => {
     try {
       const next = await vacation.toggle();
-      Alert.alert("Vacation", next ? "Day marked as vacation" : "Vacation removed");
+      Alert.alert(t("home.vacationAlertTitle"), next ? t("home.vacationMarked") : t("home.vacationRemoved"));
     } catch (err: any) {
       if (err.message === "AUTH_EXPIRED") { signOut(); return; }
-      Alert.alert("Error", err.message ?? "Could not toggle vacation");
+      Alert.alert(t("home.vacationAlertTitle"), err.message ?? t("home.vacationError"));
     }
   };
 
@@ -262,7 +263,7 @@ function DayView({
           ]}
         >
           <Text style={[styles.vacationChipText, isVacationDay && styles.vacationChipTextActive]}>
-            {isVacationDay ? "🏖️ Vacation" : "🏖️ Off day"}
+            {isVacationDay ? t("home.vacationChip") : t("home.offDayChip")}
           </Text>
         </Pressable>
 
@@ -283,7 +284,7 @@ function DayView({
             ]}
           >
             <Text style={[styles.quickFillTriggerText, showFillOptions && styles.quickFillTriggerTextActive]}>
-              {quickFillMutation.isPending ? "⏳" : "⚡"} Quick Fill
+              {quickFillMutation.isPending ? "⏳" : ""}{t("home.quickFill")}
             </Text>
           </Pressable>
         ) : null}
@@ -291,7 +292,7 @@ function DayView({
 
       {!isVacationDay && showFillOptions ? (
         <View style={styles.fillOptionsRow}>
-          <Text style={styles.fillOptionsLabel}>Fill to</Text>
+          <Text style={styles.fillOptionsLabel}>{t("home.fillTo")}</Text>
           {QUICK_FILL_LEVELS.map((level) => (
             <Pressable
               key={level}
@@ -308,28 +309,28 @@ function DayView({
       {diaryDayQuery.isLoading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading your summary…</Text>
+          <Text style={styles.loadingText}>{t("home.loadingDay")}</Text>
         </View>
       ) : null}
 
       {diaryDayQuery.isError ? (
         <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>Could not load daily summary</Text>
+          <Text style={styles.errorTitle}>{t("home.loadFailed")}</Text>
           <Text style={styles.errorText}>
-            {isAuthExpired ? "Session expired. Please sign in again." : (diaryDayQuery.error as Error).message}
+            {isAuthExpired ? t("home.sessionExpired") : (diaryDayQuery.error as Error).message}
           </Text>
           <View style={styles.row}>
             {isAuthExpired ? (
               <Pressable onPress={signOut} accessibilityRole="button"
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
               >
-                <Text style={styles.secondaryButtonText}>Sign in again</Text>
+                <Text style={styles.secondaryButtonText}>{t("home.signInButton")}</Text>
               </Pressable>
             ) : null}
             <Pressable onPress={() => diaryDayQuery.refetch()} accessibilityRole="button"
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             >
-              <Text style={styles.primaryButtonText}>Retry</Text>
+              <Text style={styles.primaryButtonText}>{t("home.retry")}</Text>
             </Pressable>
           </View>
         </View>
@@ -338,15 +339,15 @@ function DayView({
       {!diaryDayQuery.isLoading && !diaryDayQuery.isError && isVacationDay ? (
         <View style={styles.vacationHero}>
           <Text style={styles.vacationHeroIcon}>🏝️</Text>
-          <Text style={styles.vacationHeroTitle}>Vacation Day</Text>
-          <Text style={styles.vacationHeroText}>Relax and recharge. Food logging is paused for this day.</Text>
+          <Text style={styles.vacationHeroTitle}>{t("home.vacationHeroTitle")}</Text>
+          <Text style={styles.vacationHeroText}>{t("home.vacationHeroText")}</Text>
         </View>
       ) : null}
 
       {!isVacationDay && summary ? (
         <>
           <View style={styles.calorieCard}>
-            <Text style={styles.calorieLabel}>Daily Calories</Text>
+            <Text style={styles.calorieLabel}>{t("home.dailyCalories")}</Text>
             <View style={styles.calorieRow}>
               <Text style={[styles.calorieConsumed, { color: calorieColor }]}>{summary.caloriesConsumed}</Text>
               <Text style={styles.calorieSlash}> / </Text>
@@ -357,23 +358,23 @@ function DayView({
               <View style={[styles.progressFill, { width: `${Math.round(calorieProgressBar * 100)}%` as any, backgroundColor: calorieColor }]} />
             </View>
             <View style={styles.calorieFooter}>
-              <Text style={styles.remainingText}>{summary.caloriesRemaining} kcal remaining</Text>
+              <Text style={styles.remainingText}>{summary.caloriesRemaining} {t("home.kcalRemaining")}</Text>
               <Text style={[styles.progressPct, { color: calorieColor }]}>{Math.round(calorieProgress * 100)}%</Text>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Macronutrients</Text>
+          <Text style={styles.sectionTitle}>{t("home.macronutrients")}</Text>
           <View style={styles.macroRow}>
-            <MacroCard label="Protein" value={summary.protein} limit={summary.proteinLimit} invertColorByLimit />
-            <MacroCard label="Carbs"   value={summary.carbs}   limit={summary.carbsLimit} />
-            <MacroCard label="Fats"    value={summary.fats}    limit={summary.fatsLimit} />
+            <MacroCard label={t("logFood.protein")} value={summary.protein} limit={summary.proteinLimit} invertColorByLimit />
+            <MacroCard label={t("logFood.carbs")}   value={summary.carbs}   limit={summary.carbsLimit} />
+            <MacroCard label={t("logFood.fats")}    value={summary.fats}    limit={summary.fatsLimit} />
           </View>
         </>
       ) : null}
 
       {!isVacationDay ? (
         <>
-          <Text style={styles.sectionTitle}>Meals</Text>
+          <Text style={styles.sectionTitle}>{t("home.meals")}</Text>
           {diaryDayQuery.isLoading ? (
             <ActivityIndicator size="small" color="#16a34a" />
           ) : (
@@ -477,16 +478,16 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.greeting}>
-            {user?.name ? `Hi, ${user.name.split(" ")[0]} 👋` : "Welcome back"}
+            {user?.name ? t("home.greeting").replace("{name}", user.name.split(" ")[0]) : t("home.welcome")}
           </Text>
           {!isToday ? (
             <Pressable onPress={goToToday} style={({ pressed }) => [styles.todayPill, pressed && styles.buttonPressed]}>
-              <Text style={styles.todayPillText}>↩ Today</Text>
+              <Text style={styles.todayPillText}>{t("home.goToToday")}</Text>
             </Pressable>
           ) : null}
         </View>
         <View style={styles.dateLabelWrap}>
-          <Text style={styles.dateLabelMain}>{isToday ? "Today" : dayjs(activeDate).format("dddd")}</Text>
+          <Text style={styles.dateLabelMain}>{isToday ? t("home.today") : dayjs(activeDate).format("dddd")}</Text>
           <Text style={styles.dateLabelSub}>{dayjs(activeDate).format("MMM D, YYYY")}</Text>
         </View>
       </View>

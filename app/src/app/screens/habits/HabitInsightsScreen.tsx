@@ -34,6 +34,7 @@ import {
   type Goal,
 } from "../../services/habits/habitApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 type FormState = {
   habitName: string;
@@ -92,27 +93,28 @@ function HabitManageModal({
   onClose: () => void;
   onSubmit: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Edit Habit</Text>
-          <Text style={styles.modalSubtitle}>Update the habit name and regularity from here.</Text>
+          <Text style={styles.modalTitle}>{t("habitInsights.manageTitle")}</Text>
+          <Text style={styles.modalSubtitle}>{t("habitInsights.manageSubtitle")}</Text>
 
-          <Text style={styles.fieldLabel}>Habit Name</Text>
+          <Text style={styles.fieldLabel}>{t("habitInsights.habitName")}</Text>
           <TextInput
             value={formState.habitName}
             onChangeText={(habitName) => setFormState({ ...formState, habitName })}
-            placeholder="Habit name"
+            placeholder={t("habitInsights.habitNamePlaceholder")}
             placeholderTextColor="#9ca3af"
             style={styles.input}
           />
 
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={styles.fieldLabel}>{t("habitInsights.description")}</Text>
           <TextInput
             value={formState.description}
             onChangeText={(description) => setFormState({ ...formState, description })}
-            placeholder="Optional detail"
+            placeholder={t("habitInsights.descriptionPlaceholder")}
             placeholderTextColor="#9ca3af"
             multiline
             style={[styles.input, styles.textArea]}
@@ -123,7 +125,7 @@ function HabitManageModal({
             style={({ pressed }) => [styles.goalToggle, formState.goalEnabled && styles.goalToggleActive, pressed && styles.pressed]}
           >
             <Text style={[styles.goalToggleText, formState.goalEnabled && styles.goalToggleTextActive]}>
-              {formState.goalEnabled ? "Goal enabled" : "Add a goal"}
+              {formState.goalEnabled ? t("habitInsights.goalEnabled") : t("habitInsights.addGoal")}
             </Text>
           </Pressable>
 
@@ -131,8 +133,8 @@ function HabitManageModal({
             <>
               <View style={styles.goalTypeRow}>
                 {[
-                  { label: "Per week", value: "DAYS_PER_WEEK" as const },
-                  { label: "Per month", value: "DAYS_PER_MONTH" as const },
+                  { label: t("habitInsights.perWeek"), value: "DAYS_PER_WEEK" as const },
+                  { label: t("habitInsights.perMonth"), value: "DAYS_PER_MONTH" as const },
                 ].map((option) => (
                   <Pressable
                     key={option.value}
@@ -150,7 +152,7 @@ function HabitManageModal({
                 ))}
               </View>
 
-              <Text style={styles.fieldLabel}>Target Days</Text>
+              <Text style={styles.fieldLabel}>{t("habitInsights.targetDays")}</Text>
               <TextInput
                 value={formState.targetDays}
                 onChangeText={(targetDays) => setFormState({ ...formState, targetDays })}
@@ -223,6 +225,7 @@ function HabitCalendarMonthPage({
   onNextMonth: () => void;
   onDayTap: (date: string, currentValue?: boolean) => void;
 }) {
+  const { t } = useLanguage();
   const calendarQuery = useQuery({
     queryKey: ["habitCalendar", habitId, month.format("YYYY-MM")],
     queryFn: async () => {
@@ -253,7 +256,7 @@ function HabitCalendarMonthPage({
       </View>
 
       <View style={styles.weekHeader}>
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
+        {[t("habitInsights.weekMon"), t("habitInsights.weekTue"), t("habitInsights.weekWed"), t("habitInsights.weekThu"), t("habitInsights.weekFri"), t("habitInsights.weekSat"), t("habitInsights.weekSun")].map((label) => (
           <Text key={`${month.format("YYYY-MM")}-${label}`} style={styles.weekHeaderText}>{label}</Text>
         ))}
       </View>
@@ -261,7 +264,7 @@ function HabitCalendarMonthPage({
       {calendarQuery.isLoading ? <ActivityIndicator size="small" color="#16a34a" /> : null}
 
       {calendarQuery.isError ? (
-        <Text style={styles.calendarErrorText}>Could not load this month.</Text>
+        <Text style={styles.calendarErrorText}>{t("habitInsights.calendarError")}</Text>
       ) : null}
 
       {pageWeeks.map((week, rowIndex) => (
@@ -303,6 +306,7 @@ function HabitCalendarMonthPage({
 
 export default function HabitInsightsScreen() {
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute<HabitInsightsRoute>();
@@ -544,7 +548,7 @@ export default function HabitInsightsScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>{pageTitle}</Text>
-            <Text style={styles.pageSubtitle}>Score history, monthly completions, and the month view for habit logging.</Text>
+            <Text style={styles.pageSubtitle}>{t("habitInsights.subtitle")}</Text>
           </View>
         </View>
 
@@ -556,11 +560,11 @@ export default function HabitInsightsScreen() {
             }}
             style={({ pressed }) => [styles.manageBtn, pressed && styles.pressed]}
           >
-            <Text style={styles.manageBtnText}>Edit habit</Text>
+            <Text style={styles.manageBtnText}>{t("habitInsights.editHabit")}</Text>
           </Pressable>
           <Pressable
             onPress={() => {
-              Alert.alert("Delete habit?", `Remove \"${pageTitle}\"?`, [
+              Alert.alert(t("habitInsights.deleteTitle"), `${t("habitInsights.deleteTitle")} "${pageTitle}"?`, [
                 { text: "Cancel", style: "cancel" },
                 {
                   text: "Delete",
@@ -577,29 +581,29 @@ export default function HabitInsightsScreen() {
             }}
             style={({ pressed }) => [styles.manageBtn, styles.manageDeleteBtn, pressed && styles.pressed]}
           >
-            <Text style={[styles.manageBtnText, styles.manageDeleteBtnText]}>Delete habit</Text>
+            <Text style={[styles.manageBtnText, styles.manageDeleteBtnText]}>{t("habitInsights.deleteHabit")}</Text>
           </Pressable>
         </View>
 
         {insightsQuery.isLoading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text style={styles.loadingText}>Loading habit insights...</Text>
+            <Text style={styles.loadingText}>{t("habitInsights.loading")}</Text>
           </View>
         ) : null}
 
         {insightsQuery.isError ? (
           <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>{isAuthExpired ? "Session expired" : "Failed to load habit insights"}</Text>
+            <Text style={styles.errorTitle}>{isAuthExpired ? t("habitInsights.sessionExpired") : t("habitInsights.loadFailed")}</Text>
             <Text style={styles.errorText}>
               {isAuthExpired
-                ? "Please sign in again."
+                ? t("habitInsights.signInAgain")
                 : (insightsQuery.error as Error)?.message}
             </Text>
             <View style={styles.actionRow}>
               {isAuthExpired ? (
                 <Pressable onPress={signOut} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                  <Text style={styles.secondaryBtnText}>Sign in again</Text>
+                  <Text style={styles.secondaryBtnText}>{t("habitInsights.signInButton")}</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -608,7 +612,7 @@ export default function HabitInsightsScreen() {
                 }}
                 style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
               >
-                <Text style={styles.primaryBtnText}>Retry</Text>
+                <Text style={styles.primaryBtnText}>{t("habitInsights.retry")}</Text>
               </Pressable>
             </View>
           </View>
@@ -617,14 +621,14 @@ export default function HabitInsightsScreen() {
         {!insightsQuery.isLoading && !insightsQuery.isError && insightsQuery.data ? (
           <>
             <View style={styles.statsRow}>
-              <InsightStat label="Points" value={insightsQuery.data.metrics.habitScore} />
-              <InsightStat label="Month" value={insightsQuery.data.metrics.monthlySuccess} />
-              <InsightStat label="Year" value={insightsQuery.data.metrics.yearlySuccess} />
+              <InsightStat label={t("habitInsights.points")} value={insightsQuery.data.metrics.habitScore} />
+              <InsightStat label={t("habitInsights.month")} value={insightsQuery.data.metrics.monthlySuccess} />
+              <InsightStat label={t("habitInsights.year")} value={insightsQuery.data.metrics.yearlySuccess} />
             </View>
 
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Score Trend</Text>
-              <Text style={styles.chartSubtitle}>Last 12 months</Text>
+              <Text style={styles.chartTitle}>{t("habitInsights.scoreTrend")}</Text>
+              <Text style={styles.chartSubtitle}>{t("habitInsights.last12months")}</Text>
               {scoreChart.values.length ? (
                 <LineChart
                   data={{ labels: scoreChart.labels, datasets: [{ data: scoreChart.values, color: () => "#16a34a", strokeWidth: 3 }] }}
@@ -642,13 +646,13 @@ export default function HabitInsightsScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <Text style={styles.emptyChartText}>No score history yet.</Text>
+                <Text style={styles.emptyChartText}>{t("habitInsights.noScoreHistory")}</Text>
               )}
             </View>
 
             <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Completed Days by Month</Text>
-              <Text style={styles.chartSubtitle}>Last 12 months</Text>
+              <Text style={styles.chartTitle}>{t("habitInsights.completedByMonth")}</Text>
+              <Text style={styles.chartSubtitle}>{t("habitInsights.last12months")}</Text>
               {monthlyStatsChart.values.length ? (
                 <BarChart
                   data={{ labels: monthlyStatsChart.labels, datasets: [{ data: monthlyStatsChart.values }] }}
@@ -668,7 +672,7 @@ export default function HabitInsightsScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <Text style={styles.emptyChartText}>No monthly completion data yet.</Text>
+                <Text style={styles.emptyChartText}>{t("habitInsights.noMonthlyData")}</Text>
               )}
             </View>
 
@@ -712,7 +716,7 @@ export default function HabitInsightsScreen() {
                 />
               </View>
 
-              <Text style={styles.calendarHint}>Swipe month, tap a day to toggle success/failure.</Text>
+              <Text style={styles.calendarHint}>{t("habitInsights.calendarHint")}</Text>
             </View>
           </>
         ) : null}

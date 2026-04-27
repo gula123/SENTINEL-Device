@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LineChart } from "react-native-chart-kit";
 import { useMetrics } from "../../hooks/useMetrics";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 
 type DailyPoint = {
   date: string;
@@ -112,10 +113,10 @@ const classifyDayType = (consumed: number, limit: number) => {
   return "exceeded" as const;
 };
 
-const outcomeLabelForScore = (score: number) => {
-  if (score >= 35) return "Likely weight loss";
-  if (score <= -35) return "Likely fat gain";
-  return "Likely maintenance";
+const outcomeLabelForScoreKey = (score: number) => {
+  if (score >= 35) return "metrics.likelyLoss";
+  if (score <= -35) return "metrics.likelyGain";
+  return "metrics.likelyMaintenance";
 };
 
 const average = (values: number[]) => values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -148,6 +149,7 @@ const getMetricColorTier = (rawValue: number): MetricColorTier => {
 export default function MetricsScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const { signOut } = useAuth();
+  const { t } = useLanguage();
   const metricsQuery = useMetrics();
 
   const isAuthExpired = metricsQuery.error instanceof Error && metricsQuery.error.message === "AUTH_EXPIRED";
@@ -178,7 +180,7 @@ export default function MetricsScreen() {
       estimatedMaintenance: null,
       planAdequacy: "Insufficient history",
       dayTypes: { green: 0, yellow: 0, orange: 0, red: 0, active: 0 },
-      drivers: ["Not enough monthly data yet"],
+      drivers: ["metrics.notEnoughData"],  // i18n key, resolved in render
     };
 
     if (!metricsQuery.data) {
@@ -529,35 +531,31 @@ export default function MetricsScreen() {
     const outcomeScore = clamp((dayTypeScore * 0.3) + (mealHabitScore * 0.2) + (weightTrendScore * 0.1) + (adequacyScore * 0.4), -100, 100);
 
     const loggedDays = monthlyDailyPoints.filter((point) => point.hasFoodData).length;
-    const confidence = loggedDays >= 20 && priorHistoricalMonths.length >= 3
+    const confidence: "High" | "Medium" | "Low" = loggedDays >= 20 && priorHistoricalMonths.length >= 3
       ? "High"
       : loggedDays >= 10 && priorHistoricalMonths.length >= 1
         ? "Medium"
         : "Low";
 
     const drivers: string[] = [];
-    drivers.push(`Day mix: ${dayTypeCounts.green} green, ${dayTypeCounts.yellow} yellow, ${dayTypeCounts.orange} orange, ${dayTypeCounts.red} red`);
+    drivers.push(`metrics.driverDayMix|${dayTypeCounts.green}|${dayTypeCounts.yellow}|${dayTypeCounts.orange}|${dayTypeCounts.red}`);
 
     if (estimatedMaintenance && currentAverageCalories > 0) {
-      drivers.push(`Avg logged intake ${Math.round(currentAverageCalories)} kcal vs estimated maintenance ${Math.round(estimatedMaintenance)} kcal`);
+      drivers.push(`metrics.driverAvgIntake|${Math.round(currentAverageCalories)}|${Math.round(estimatedMaintenance)}`);
     }
 
-    drivers.push(`Meal consistency ${Math.round(monthlyPerMealAdherenceValue)}%`);
-    drivers.push(`Habit completion ${Math.round(monthlyHabitRateValue)}%`);
+    drivers.push(`metrics.driverMealConsistency|${Math.round(monthlyPerMealAdherenceValue)}`);
+    drivers.push(`metrics.driverHabitCompletion|${Math.round(monthlyHabitRateValue)}`);
 
     if (avgWeightChange !== 0) {
-      const direction = avgWeightChange > 0 ? "up" : "down";
-      drivers.push(`Recent weight trend ${direction} (${Math.abs(clampOneDecimal(avgWeightChange))} kg avg change)`);
+      const direction = avgWeightChange > 0 ? "Up" : "Down";
+      drivers.push(`metrics.driverWeightTrend${direction}|${Math.abs(clampOneDecimal(avgWeightChange))}`);
     }
 
-    if (planAdequacy === "Too lenient") drivers.push("Current intake looks above your historical weight-neutral zone");
-    if (planAdequacy === "Supports loss") drivers.push("Current intake looks below your historical weight-neutral zone");
+    if (planAdequacy === "Too lenient") drivers.push("metrics.driverAboveNeutral");
+    if (planAdequacy === "Supports loss") drivers.push("metrics.driverBelowNeutral");
 
-    const confidenceReason = confidence === "High"
-      ? `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior months`
-      : confidence === "Medium"
-        ? `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior month${priorHistoricalMonths.length !== 1 ? "s" : ""} (need 20+ days & 3+ months for High)`
-        : `Confidence: ${loggedDays} days logged, ${priorHistoricalMonths.length} prior month${priorHistoricalMonths.length !== 1 ? "s" : ""} (need 10+ days & 1+ month for Medium)`;
+    const confidenceReason = `metrics.driverConfidence${confidence === "High" ? "High" : "MediumLow"}|${loggedDays}|${priorHistoricalMonths.length}`;
     drivers.push(confidenceReason);
 
     return {
@@ -581,7 +579,7 @@ export default function MetricsScreen() {
       outcome: {
         score: clampOneDecimal(outcomeScore),
         confidence,
-        label: outcomeLabelForScore(outcomeScore),
+        label: outcomeLabelForScoreKey(outcomeScore),
         averageDailyCalories: clampOneDecimal(currentAverageCalories),
         estimatedMaintenance: estimatedMaintenance ? clampOneDecimal(estimatedMaintenance) : null,
         planAdequacy,
@@ -600,30 +598,30 @@ export default function MetricsScreen() {
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={s.pageTitle}>Metrics</Text>
-        <Text style={s.pageSubtitle}>Use this page to spot what is working and what you can improve next.</Text>
+        <Text style={s.pageTitle}>{t("metrics.title")}</Text>
+        <Text style={s.pageSubtitle}>{t("metrics.subtitle")}</Text>
 
         {metricsQuery.isLoading ? (
           <View style={s.loadingBox}>
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text style={s.muted}>Loading metrics...</Text>
+            <Text style={s.muted}>{t("metrics.loading")}</Text>
           </View>
         ) : null}
 
         {metricsQuery.isError ? (
           <View style={s.errorBox}>
-            <Text style={s.errorTitle}>{isAuthExpired ? "Session expired" : "Failed to load metrics"}</Text>
+            <Text style={s.errorTitle}>{isAuthExpired ? t("metrics.sessionExpired") : t("metrics.loadFailed")}</Text>
             <Text style={s.errorText}>
-              {isAuthExpired ? "Please sign in again." : (metricsQuery.error as Error).message}
+              {isAuthExpired ? t("metrics.signInAgain") : (metricsQuery.error as Error).message}
             </Text>
             <View style={s.errorActions}>
               {isAuthExpired ? (
                 <Pressable onPress={signOut} style={({ pressed }) => [s.secondaryBtn, pressed && s.pressed]}>
-                  <Text style={s.secondaryBtnText}>Sign in again</Text>
+                  <Text style={s.secondaryBtnText}>{t("metrics.signInButton")}</Text>
                 </Pressable>
               ) : null}
               <Pressable onPress={() => metricsQuery.refetch()} style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]}>
-                <Text style={s.primaryBtnText}>Retry</Text>
+                <Text style={s.primaryBtnText}>{t("metrics.retry")}</Text>
               </Pressable>
             </View>
           </View>
@@ -634,18 +632,18 @@ export default function MetricsScreen() {
             <MonthlyOutcomeCard outcome={outcome} />
 
             <View style={s.cardGrid}>
-              <StatPairCard title="Habit Completion Rate" month={stats.monthlyHabitRate} year={stats.yearlyHabitRate} />
-              <StatPairCard title="Calorie Target Success" month={stats.monthlyCalorieAdherence} year={stats.yearlyCalorieAdherence} />
-              <StatPairCard title="Habit-Weight Correlation" month={stats.monthlyCorrelation} year={stats.yearlyCorrelation} />
-              <StatPairCard title="Carbs Target Success" month={stats.monthlyCarbsAdherence} year={stats.yearlyCarbsAdherence} />
-              <StatPairCard title="Protein Target Success" month={stats.monthlyProteinAdherence} year={stats.yearlyProteinAdherence} />
-              <StatPairCard title="Fat Target Success" month={stats.monthlyFatsAdherence} year={stats.yearlyFatsAdherence} />
-              <StatPairCard title="Per-Meal Calorie Success" month={stats.monthlyPerMealCalorieAdherence} year={stats.yearlyPerMealCalorieAdherence} />
+              <StatPairCard title={t("metrics.habitCompletion")} month={stats.monthlyHabitRate} year={stats.yearlyHabitRate} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.calorieTarget")} month={stats.monthlyCalorieAdherence} year={stats.yearlyCalorieAdherence} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.habitWeightCorr")} month={stats.monthlyCorrelation} year={stats.yearlyCorrelation} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.carbsTarget")} month={stats.monthlyCarbsAdherence} year={stats.yearlyCarbsAdherence} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.proteinTarget")} month={stats.monthlyProteinAdherence} year={stats.yearlyProteinAdherence} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.fatTarget")} month={stats.monthlyFatsAdherence} year={stats.yearlyFatsAdherence} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
+              <StatPairCard title={t("metrics.perMealCalorie")} month={stats.monthlyPerMealCalorieAdherence} year={stats.yearlyPerMealCalorieAdherence} thisMonthLabel={t("metrics.thisMonth")} thisYearLabel={t("metrics.thisYear")} />
             </View>
 
             <View style={s.chartCard}>
-              <Text style={s.chartTitle}>Monthly Habit Score vs Calorie Success</Text>
-              <Text style={s.chartSub}>Last 12 months</Text>
+              <Text style={s.chartTitle}>{t("metrics.chartTitle")}</Text>
+              <Text style={s.chartSub}>{t("metrics.last12months")}</Text>
               <View style={s.chartBox}>
                 <LineChart
                   data={{
@@ -654,7 +652,7 @@ export default function MetricsScreen() {
                       { data: monthlyData.map((point) => point.habitScore), strokeWidth: 2.5, color: () => "#16a34a" },
                       { data: monthlyData.map((point) => point.calorieAdherence), strokeWidth: 2.5, color: () => "#f97316" },
                     ],
-                    legend: ["Habits %", "Calories %"],
+                    legend: [t("metrics.habitsPercent"), t("metrics.caloriesPercent")],
                   }}
                   width={chartWidth}
                   height={220}
@@ -691,14 +689,15 @@ export default function MetricsScreen() {
 
 function MonthlyOutcomeCard({ outcome }: { outcome: MonthlyOutcome }) {
   const [showSignals, setShowSignals] = useState(false);
+  const { t } = useLanguage();
   const pointerLeft = `${((outcome.score + 100) / 200) * 100}%`;
 
   return (
     <View style={s.outcomeCard}>
       <View style={s.outcomeHeader}>
-        <Text style={s.outcomeTitle}>Monthly Outcome Projection</Text>
+        <Text style={s.outcomeTitle}>{t("metrics.monthlyOutcome")}</Text>
         <View style={s.outcomeConfidencePill}>
-          <Text style={s.outcomeConfidenceText}>{outcome.confidence} confidence</Text>
+          <Text style={s.outcomeConfidenceText}>{t("metrics.confidence").replace("{confidence}", t(`metrics.confidence${outcome.confidence}`))}</Text>
         </View>
       </View>
 
@@ -708,31 +707,48 @@ function MonthlyOutcomeCard({ outcome }: { outcome: MonthlyOutcome }) {
           <View style={s.outcomeScaleCenter} />
           <View style={s.outcomeScaleRight} />
         </View>
-        <View style={[s.outcomePointer, { left: pointerLeft }]} />
+        <View style={[s.outcomePointer, { left: pointerLeft as `${number}%` }]} />
       </View>
 
       <View style={s.outcomeLegendRow}>
-        <Text style={s.outcomeLegendLeft}>Fat gain risk</Text>
-        <Text style={s.outcomeLegendRight}>Weight loss direction</Text>
+        <Text style={s.outcomeLegendLeft}>{t("metrics.fatGainRisk")}</Text>
+        <Text style={s.outcomeLegendRight}>{t("metrics.weightLossDirection")}</Text>
       </View>
+
+      <Text style={s.outcomeResultLabel}>{t(outcome.label)}</Text>
 
       <Pressable
         onPress={() => setShowSignals((prev) => !prev)}
         accessibilityRole="button"
         style={({ pressed }) => [s.outcomeSignalsToggle, pressed && s.pressed]}
       >
-        <Text style={s.outcomeSignalsToggleText}>{showSignals ? "Hide signals ▴" : "Show signals ▾"}</Text>
+        <Text style={s.outcomeSignalsToggleText}>{showSignals ? t("metrics.hideSignals") : t("metrics.showSignals")}</Text>
       </Pressable>
 
       {showSignals ? (
         <View style={s.outcomeSignalsWrap}>
-          <Text style={s.outcomeSignalsTitle}>Signals considered</Text>
+          <Text style={s.outcomeSignalsTitle}>{t("metrics.signalsConsidered")}</Text>
           <View style={s.outcomeSignalGrid}>
-            {outcome.drivers.map((driver) => (
-              <View key={driver} style={s.outcomeSignalChip}>
-                <Text style={s.outcomeSignalText}>{driver}</Text>
-              </View>
-            ))}
+            {outcome.drivers.map((driver) => {
+              const parts = driver.split("|");
+              const key = parts[0];
+              const params = parts.slice(1);
+              let text: string;
+              if (key.startsWith("metrics.")) {
+                text = t(key);
+                const found = Array.from(text.matchAll(/\{[^}]+\}/g)).map((m) => m[0]);
+                found.forEach((placeholder, i) => {
+                  if (i < params.length) text = text.replace(placeholder, params[i]);
+                });
+              } else {
+                text = driver;
+              }
+              return (
+                <View key={driver} style={s.outcomeSignalChip}>
+                  <Text style={s.outcomeSignalText}>{text}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       ) : null}
@@ -744,10 +760,14 @@ function StatPairCard({
   title,
   month,
   year,
+  thisMonthLabel,
+  thisYearLabel,
 }: {
   title: string;
   month: number;
   year: number;
+  thisMonthLabel: string;
+  thisYearLabel: string;
 }) {
   const monthValue = Math.max(0, Math.min(100, month));
   const yearValue = Math.max(0, Math.min(100, year));
@@ -763,14 +783,14 @@ function StatPairCard({
           <View style={[s.valuePill, { backgroundColor: monthTier.bg, borderColor: monthTier.border }]}>
             <Text style={[s.statValue, { color: monthTier.text }]}>{monthValue.toFixed(1)}%</Text>
           </View>
-          <Text style={s.statCaption}>This Month</Text>
+          <Text style={s.statCaption}>{thisMonthLabel}</Text>
         </View>
         <View style={s.statDivider} />
         <View style={s.statItem}>
           <View style={[s.valuePill, { backgroundColor: yearTier.bg, borderColor: yearTier.border }]}>
             <Text style={[s.statValue, { color: yearTier.text }]}>{yearValue.toFixed(1)}%</Text>
           </View>
-          <Text style={s.statCaption}>This Year</Text>
+          <Text style={s.statCaption}>{thisYearLabel}</Text>
         </View>
       </View>
     </View>
@@ -923,6 +943,7 @@ const s = StyleSheet.create({
   outcomeLegendRow: { flexDirection: "row", justifyContent: "space-between" },
   outcomeLegendLeft: { fontSize: 11, color: "#991b1b", fontWeight: "700" },
   outcomeLegendRight: { fontSize: 11, color: "#166534", fontWeight: "700" },
+  outcomeResultLabel: { fontSize: 15, fontWeight: "700", color: "#111827", textAlign: "center", marginTop: 4 },
   outcomeSignalsWrap: {
     gap: 8,
     borderTopWidth: 1,

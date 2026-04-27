@@ -130,22 +130,22 @@ function HabitFormModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>{t("habits.create")}</Text>
-          <Text style={styles.modalSubtitle}>Create the same habit widgets you use on the frontend.</Text>
+          <Text style={styles.modalSubtitle}>{t("habits.formSubtitle")}</Text>
 
-          <Text style={styles.fieldLabel}>Habit Name</Text>
+          <Text style={styles.fieldLabel}>{t("habits.habitName")}</Text>
           <TextInput
             value={formState.habitName}
             onChangeText={(habitName) => setFormState({ ...formState, habitName })}
-            placeholder="Example: Walk 8k steps"
+            placeholder={t("habits.habitNamePlaceholder")}
             placeholderTextColor="#9ca3af"
             style={styles.input}
           />
 
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={styles.fieldLabel}>{t("habits.description")}</Text>
           <TextInput
             value={formState.description}
             onChangeText={(description) => setFormState({ ...formState, description })}
-            placeholder="Optional detail"
+            placeholder={t("habits.descriptionPlaceholder")}
             placeholderTextColor="#9ca3af"
             multiline
             style={[styles.input, styles.textArea]}
@@ -156,7 +156,7 @@ function HabitFormModal({
             style={({ pressed }) => [styles.goalToggle, formState.goalEnabled && styles.goalToggleActive, pressed && styles.pressed]}
           >
             <Text style={[styles.goalToggleText, formState.goalEnabled && styles.goalToggleTextActive]}>
-              {formState.goalEnabled ? "Goal enabled" : "Add a goal"}
+              {formState.goalEnabled ? t("habits.goalEnabled") : t("habits.addGoal")}
             </Text>
           </Pressable>
 
@@ -164,8 +164,8 @@ function HabitFormModal({
             <>
               <View style={styles.goalTypeRow}>
                 {[
-                  { label: "Per week", value: "DAYS_PER_WEEK" as const },
-                  { label: "Per month", value: "DAYS_PER_MONTH" as const },
+                  { label: t("habits.perWeek"), value: "DAYS_PER_WEEK" as const },
+                  { label: t("habits.perMonth"), value: "DAYS_PER_MONTH" as const },
                 ].map((option) => (
                   <Pressable
                     key={option.value}
@@ -188,7 +188,7 @@ function HabitFormModal({
                 ))}
               </View>
 
-              <Text style={styles.fieldLabel}>Target Days</Text>
+              <Text style={styles.fieldLabel}>{t("habits.targetDays")}</Text>
               <TextInput
                 value={formState.targetDays}
                 onChangeText={(targetDays) => setFormState({ ...formState, targetDays })}
@@ -218,12 +218,12 @@ function HabitFormModal({
   );
 }
 
-const formatGoalLabel = (goal?: Goal): string | null => {
+const formatGoalLabel = (goal: Goal | undefined, t: (key: string) => string): string | null => {
   if (!goal) return null;
-  if (goal.goalType === "DAILY") return "Every day";
+  if (goal.goalType === "DAILY") return t("habits.everyDayLabel");
   return goal.goalType === "DAYS_PER_WEEK"
-    ? `${goal.targetDays}x / week`
-    : `${goal.targetDays}x / month`;
+    ? `${goal.targetDays}${t("habits.perWeekLabel")}`
+    : `${goal.targetDays}${t("habits.perMonthLabel")}`;
 };
 
 export default function HabitsScreen() {
@@ -396,10 +396,10 @@ export default function HabitsScreen() {
         <View style={styles.pageHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>{t("habits.title")}</Text>
-            <Text style={styles.pageSubtitle}>Your frontend habit widgets, optimized for mobile.</Text>
+            <Text style={styles.pageSubtitle}>{t("habits.subtitle2")}</Text>
           </View>
           <Pressable onPress={openCreateModal} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-            <Text style={styles.addButtonText}>+ New</Text>
+            <Text style={styles.addButtonText}>{t("habits.newShort")}</Text>
           </Pressable>
         </View>
 
@@ -421,7 +421,7 @@ export default function HabitsScreen() {
             <View style={styles.row}>
               {isAuthExpired ? (
                 <Pressable onPress={signOut} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-                  <Text style={styles.secondaryBtnText}>Sign in again</Text>
+                  <Text style={styles.secondaryBtnText}>{t("habits.signInButton")}</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -431,7 +431,7 @@ export default function HabitsScreen() {
                 }}
                 style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}
               >
-                <Text style={styles.primaryBtnText}>Retry</Text>
+                <Text style={styles.primaryBtnText}>{t("habits.retry")}</Text>
               </Pressable>
             </View>
           </View>
@@ -439,10 +439,10 @@ export default function HabitsScreen() {
 
         {!isLoading && !habitsQuery.isError && habitsQuery.data?.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No habits yet</Text>
-            <Text style={styles.emptyText}>Create your first habit to start tracking the same way as on the frontend.</Text>
+            <Text style={styles.emptyTitle}>{t("habits.noHabits")}</Text>
+            <Text style={styles.emptyText}>{t("habits.emptyText")}</Text>
             <Pressable onPress={openCreateModal} style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed]}>
-              <Text style={styles.primaryBtnText}>Create Habit</Text>
+              <Text style={styles.primaryBtnText}>{t("habits.createButton")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -452,7 +452,7 @@ export default function HabitsScreen() {
             {habitsQuery.data.map((habit) => {
               const metrics = widgets.metricsByHabitId[habit.id];
               const recentDays = widgets.lastFourDaysByHabitId[habit.id] || [];
-              const goalLabel = formatGoalLabel(habit.goal);
+              const goalLabel = formatGoalLabel(habit.goal, t);
 
               return (
                 <Pressable
@@ -467,9 +467,9 @@ export default function HabitsScreen() {
                     </View>
 
                     <View style={styles.metricsCluster}>
-                      <MetricPill label="Pts" value={metrics?.habitScore ?? 0} />
-                      <MetricPill label="Mo" value={metrics?.monthlySuccess ?? 0} />
-                      <MetricPill label="Yr" value={metrics?.yearlySuccess ?? 0} />
+                      <MetricPill label={t("habits.pts")} value={metrics?.habitScore ?? 0} />
+                      <MetricPill label={t("habits.mo")} value={metrics?.monthlySuccess ?? 0} />
+                      <MetricPill label={t("habits.yr")} value={metrics?.yearlySuccess ?? 0} />
                     </View>
                   </View>
 

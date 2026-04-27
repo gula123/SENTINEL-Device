@@ -7,6 +7,7 @@ import MetricsScreen from "../screens/metrics/MetricsScreen";
 import ProgressScreen from "../screens/progress/ProgressScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import WeightDiaryScreen from "../screens/weight/WeightDiaryScreen";
+import { useLanguage } from "../state/LanguageContext";
 
 export type MainTabParamList = {
   Diary: { date?: string; focusToken?: number } | undefined;
@@ -31,6 +32,7 @@ const TAB_ICONS: Record<string, string> = {
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomInset = Platform.OS === "web" ? 10 : Math.max(insets.bottom, 10);
+  const { t } = useLanguage();
 
   return (
     <Tab.Navigator
@@ -63,12 +65,12 @@ export default function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Diary" component={HomeScreen} options={{ tabBarLabel: "Diary" }} />
-      <Tab.Screen name="Habits" component={HabitsScreen} options={{ tabBarLabel: "Habits" }} />
-      <Tab.Screen name="Metrics" component={MetricsScreen} options={{ tabBarLabel: "Metrics" }} />
-      <Tab.Screen name="Progress" component={ProgressScreen} options={{ tabBarLabel: "Calendar" }} />
-      <Tab.Screen name="Weight" component={WeightDiaryScreen} options={{ tabBarLabel: "Weight" }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: "Settings" }} />
+      <Tab.Screen name="Diary" component={HomeScreen} options={{ tabBarLabel: t("nav.diary") }} />
+      <Tab.Screen name="Habits" component={HabitsScreen} options={{ tabBarLabel: t("nav.habits") }} />
+      <Tab.Screen name="Metrics" component={MetricsScreen} options={{ tabBarLabel: t("nav.metrics") }} />
+      <Tab.Screen name="Progress" component={ProgressScreen} options={{ tabBarLabel: t("nav.calendar") }} />
+      <Tab.Screen name="Weight" component={WeightDiaryScreen} options={{ tabBarLabel: t("nav.weight") }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t("nav.settings") }} />
     </Tab.Navigator>
   );
 }

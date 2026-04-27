@@ -157,7 +157,7 @@ function MonthPage({
 
   const weightChangeLabel = useMemo(() => {
     if (monthlyWeightDelta == null) {
-      return "No data";
+      return t("progress.noData");
     }
 
     const sign = monthlyWeightDelta > 0 ? "+" : "";
@@ -182,7 +182,7 @@ function MonthPage({
         <Pressable
           onPress={onPrevMonth}
           style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
-          accessibilityLabel="Previous month"
+          accessibilityLabel={t("progress.prevMonth")}
         >
           <Text style={styles.navBtnText}>‹</Text>
         </Pressable>
@@ -190,7 +190,7 @@ function MonthPage({
         <Pressable
           onPress={onNextMonth}
           style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
-          accessibilityLabel="Next month"
+          accessibilityLabel={t("progress.nextMonth")}
         >
           <Text style={styles.navBtnText}>›</Text>
         </Pressable>
@@ -270,15 +270,15 @@ function MonthPage({
               <Text style={styles.statEmoji}>🏖️</Text>
               <Text style={styles.statValue}>{stats.vacation}</Text>
               <View style={[styles.statLabelPill, { backgroundColor: "#dbeafe" }]}> 
-                <Text style={[styles.statLabelText, { color: "#1e40af" }]}>Vacation</Text>
+                <Text style={[styles.statLabelText, { color: "#1e40af" }]}>{t("progress.vacation")}</Text>
               </View>
-              <Text style={styles.statRange}>Day off</Text>
+              <Text style={styles.statRange}>{t("progress.dayOff")}</Text>
             </View>
           </View>
 
           <View style={styles.calendarCard}>
             <View style={styles.weekRow}>
-              {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+              {[t("habitInsights.weekMon"), t("habitInsights.weekTue"), t("habitInsights.weekWed"), t("habitInsights.weekThu"), t("habitInsights.weekFri"), t("habitInsights.weekSat"), t("habitInsights.weekSun")].map((d) => (
                 <Text key={d} style={styles.weekLabel}>{d}</Text>
               ))}
             </View>
@@ -318,7 +318,7 @@ function MonthPage({
               </View>
             ))}
 
-            <Text style={styles.tapHint}>Swipe to switch month, tap a day to open diary</Text>
+            <Text style={styles.tapHint}>{t("progress.calendarHint")}</Text>
           </View>
         </>
       ) : null}
