@@ -211,21 +211,23 @@ function InsightStat({ label, value }: { label: string; value: number }) {
 function HabitCalendarMonthPage({
   token,
   habitId,
-  month,
-  pageWidth,
-  onPrevMonth,
-  onNextMonth,
-  onDayTap,
-}: {
-  token: string | null;
-  habitId: number;
-  month: dayjs.Dayjs;
-  pageWidth: number;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
-  onDayTap: (date: string, currentValue?: boolean) => void;
-}) {
-  const { t } = useLanguage();
+  import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
+  } from "react-native";
   const calendarQuery = useQuery({
     queryKey: ["habitCalendar", habitId, month.format("YYYY-MM")],
     queryFn: async () => {
@@ -539,6 +541,22 @@ export default function HabitInsightsScreen() {
     calendarPagerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
   };
 
+  const handleCalendarMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (calendarPagerWidth <= 0) return;
+    const x = event.nativeEvent.contentOffset.x;
+    const nearestIndex = Math.max(
+      0,
+      Math.min(calendarMonths.length - 1, Math.round(x / calendarPagerWidth))
+    );
+    const targetOffset = nearestIndex * calendarPagerWidth;
+
+    // Force exact alignment to prevent partial-page resting on some Android devices.
+    if (Math.abs(x - targetOffset) > 1) {
+      calendarPagerRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
+    }
+    setActiveMonthIndex(nearestIndex);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -692,11 +710,15 @@ export default function HabitInsightsScreen() {
                   horizontal
                   pagingEnabled
                   disableIntervalMomentum
+                  snapToInterval={calendarPagerWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
                   bounces={false}
                   showsHorizontalScrollIndicator={false}
                   initialScrollIndex={CALENDAR_MONTHS_RANGE}
                   getItemLayout={(_, index) => ({ length: calendarPagerWidth, offset: calendarPagerWidth * index, index })}
                   keyExtractor={(item) => item}
+                  onMomentumScrollEnd={handleCalendarMomentumEnd}
                   onViewableItemsChanged={onCalendarViewableItemsChanged.current}
                   viewabilityConfig={calendarViewabilityConfig.current}
                   renderItem={({ item }) => {
