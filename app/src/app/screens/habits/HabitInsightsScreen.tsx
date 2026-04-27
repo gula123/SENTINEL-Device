@@ -8,8 +8,6 @@ import {
   Alert,
   FlatList,
   Modal,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -531,7 +529,6 @@ export default function HabitInsightsScreen() {
       setActiveMonthIndex(viewableItems[0].index);
     }
   });
-
   const triggerPrevMonth = () => {
     const nextIndex = Math.max(0, activeMonthIndex - 1);
     calendarPagerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
@@ -542,25 +539,9 @@ export default function HabitInsightsScreen() {
     calendarPagerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
   };
 
-  const handleCalendarMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (calendarPagerWidth <= 0) return;
-    const x = event.nativeEvent.contentOffset.x;
-    const nearestIndex = Math.max(
-      0,
-      Math.min(calendarMonths.length - 1, Math.round(x / calendarPagerWidth))
-    );
-    const targetOffset = nearestIndex * calendarPagerWidth;
-
-    // Force exact alignment to prevent partial-page resting on some Android devices.
-    if (Math.abs(x - targetOffset) > 1) {
-      calendarPagerRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
-    }
-    setActiveMonthIndex(nearestIndex);
-  };
-
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
         <View style={styles.headerRow}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
             <Text style={styles.backBtnText}>‹</Text>
@@ -710,16 +691,12 @@ export default function HabitInsightsScreen() {
                   data={calendarMonths}
                   horizontal
                   pagingEnabled
-                  disableIntervalMomentum
-                  snapToInterval={calendarPagerWidth}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
                   bounces={false}
                   showsHorizontalScrollIndicator={false}
                   initialScrollIndex={CALENDAR_MONTHS_RANGE}
+                  nestedScrollEnabled
                   getItemLayout={(_, index) => ({ length: calendarPagerWidth, offset: calendarPagerWidth * index, index })}
                   keyExtractor={(item) => item}
-                  onMomentumScrollEnd={handleCalendarMomentumEnd}
                   onViewableItemsChanged={onCalendarViewableItemsChanged.current}
                   viewabilityConfig={calendarViewabilityConfig.current}
                   renderItem={({ item }) => {
