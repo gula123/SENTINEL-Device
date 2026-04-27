@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Picker } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserSettings } from "../../hooks/useUserSettings";
@@ -185,27 +185,19 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t("settings.language")}</Text>
           <Text style={styles.fieldLabel}>{t("language.selectLanguage")}</Text>
-          {Platform.OS === "ios" ? (
-            <View style={{ borderWidth: 1, borderColor: "#d1fae5", borderRadius: 12, overflow: "hidden" }}>
-              <Picker
-                selectedValue={language}
-                onValueChange={(lang) => setLanguage(lang as Language)}
-                style={{ height: 200 }}
+          <View style={styles.langRow}>
+            {(["en", "hu"] as Language[]).map((lang) => (
+              <Pressable
+                key={lang}
+                onPress={() => setLanguage(lang)}
+                style={[styles.langChip, language === lang && styles.langChipActive]}
               >
-                <Picker.Item label={t("language.english")} value="en" />
-                <Picker.Item label={t("language.hungarian")} value="hu" />
-              </Picker>
-            </View>
-          ) : (
-            <Picker
-              selectedValue={language}
-              onValueChange={(lang) => setLanguage(lang as Language)}
-              style={styles.input}
-            >
-              <Picker.Item label={t("language.english")} value="en" />
-              <Picker.Item label={t("language.hungarian")} value="hu" />
-            </Picker>
-          )}
+                <Text style={[styles.langChipText, language === lang && styles.langChipTextActive]}>
+                  {lang === "en" ? t("language.english") : t("language.hungarian")}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -346,6 +338,17 @@ const styles = StyleSheet.create({
   dayChipActive: { borderColor: "#16a34a", backgroundColor: "#dcfce7" },
   dayChipText: { fontSize: 12, color: "#374151", fontWeight: "500" },
   dayChipTextActive: { color: "#166534", fontWeight: "700" },
+
+  // Language chips
+  langRow: { flexDirection: "row", gap: 8 },
+  langChip: {
+    flex: 1, borderWidth: 1, borderColor: "#d1d5db",
+    borderRadius: 12, paddingVertical: 10,
+    alignItems: "center", backgroundColor: "#f9fafb",
+  },
+  langChipActive: { borderColor: "#16a34a", backgroundColor: "#dcfce7" },
+  langChipText: { fontSize: 14, color: "#374151", fontWeight: "600" },
+  langChipTextActive: { color: "#166534", fontWeight: "700" },
 
   // Buttons
   saveButton: {

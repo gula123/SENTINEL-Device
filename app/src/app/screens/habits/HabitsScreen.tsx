@@ -85,6 +85,9 @@ function MetricPill({ label, value }: { label: string; value: number }) {
 }
 
 function DayStatusBadge({ date, status, onPress }: { date: string; status: DayStatus; onPress: () => void }) {
+  const { t } = useLanguage();
+  const WEEK_KEYS = ["habitInsights.weekSun","habitInsights.weekMon","habitInsights.weekTue","habitInsights.weekWed","habitInsights.weekThu","habitInsights.weekFri","habitInsights.weekSat"] as const;
+  const dayLabel = t(WEEK_KEYS[dayjs(date).day()]);
   const meta =
     status === "success"
       ? { bg: "#dcfce7", text: "#166534", glyph: "✓" }
@@ -100,7 +103,7 @@ function DayStatusBadge({ date, status, onPress }: { date: string; status: DaySt
       }}
       style={({ pressed }) => [styles.dayStatusWrap, pressed && styles.pressed]}
     >
-      <Text style={styles.dayStatusLabel}>{dayjs(date).format("dd")}</Text>
+      <Text style={styles.dayStatusLabel}>{dayLabel}</Text>
       <View style={[styles.dayStatusDot, { backgroundColor: meta.bg }]}>
         <Text style={[styles.dayStatusGlyph, { color: meta.text }]}>{meta.glyph}</Text>
       </View>
