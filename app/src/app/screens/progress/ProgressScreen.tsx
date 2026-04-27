@@ -109,11 +109,12 @@ function MonthPage({
 
   const monthStart = month.startOf("month").format("YYYY-MM-DD");
   const monthEnd = month.endOf("month").format("YYYY-MM-DD");
+  const weightLookbackStart = month.subtract(1, "year").startOf("month").format("YYYY-MM-DD");
   const monthWeightQuery = useQuery({
-    queryKey: ["weightHistory", monthStart, monthEnd],
+    queryKey: ["weightHistory", weightLookbackStart, monthEnd],
     queryFn: async () => {
       if (!token) throw new Error("AUTH_REQUIRED");
-      return fetchWeightHistory(token, monthStart, monthEnd);
+      return fetchWeightHistory(token, weightLookbackStart, monthEnd);
     },
     enabled: Boolean(token),
     staleTime: 5 * 60_000,
@@ -142,18 +143,31 @@ function MonthPage({
   }, [data, vacationSet]);
 
   const monthlyWeightDelta = useMemo(() => {
-    const logs = (monthWeightQuery.data || []).slice().sort((a, b) =>
+    const allLogs = (monthWeightQuery.data || []).slice().sort((a, b) =>
       a.measurementDate.localeCompare(b.measurementDate)
     );
 
-    if (logs.length === 0) {
+    const inMonthLogs = allLogs.filter((l) => l.measurementDate >= monthStart);
+    const preMonthLogs = allLogs.filter((l) => l.measurementDate < monthStart);
+
+    if (inMonthLogs.length === 0) return null;
+
+    const endWeight = inMonthLogs[inMonthLogs.length - 1].weight;
+
+    // Baseline: always prefer last known pre-month weight.
+    // Only fall back to first in-month log if no prior data exists at all.
+    let startWeight: number;
+    if (preMonthLogs.length > 0) {
+      startWeight = preMonthLogs[preMonthLogs.length - 1].weight;
+    } else if (inMonthLogs.length > 1) {
+      startWeight = inMonthLogs[0].weight;
+    } else {
+      // Single log this month, no prior data — can't determine change
       return null;
     }
 
-    const first = logs[0].weight;
-    const last = logs[logs.length - 1].weight;
-    return Number((last - first).toFixed(1));
-  }, [monthWeightQuery.data]);
+    return Number((endWeight - startWeight).toFixed(1));
+  }, [monthWeightQuery.data, monthStart]);
 
   const weightChangeLabel = useMemo(() => {
     if (monthlyWeightDelta == null) {
