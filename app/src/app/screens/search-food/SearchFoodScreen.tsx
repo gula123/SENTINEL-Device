@@ -18,10 +18,13 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
+import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import {
+  addFavoriteFood,
   createFoodPortion,
   fetchFoodPortions,
   fetchPortionTypes,
+  removeFavoriteFood,
   type PortionDto,
   type PortionTypeDto,
   searchFoods,
@@ -67,6 +70,13 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const addMutation = useAddFoodLog(date);
+  const favoriteFoodsQuery = useFavoriteFoods(200, { enabled: Boolean(token) });
+  const [togglingFavoriteFoodId, setTogglingFavoriteFoodId] = useState<number | null>(null);
+
+  const favoriteFoodIds = useMemo(
+    () => new Set((favoriteFoodsQuery.data || []).map((f) => f.id)),
+    [favoriteFoodsQuery.data]
+  );
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -327,6 +337,29 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const onToggleSelectedFoodFavorite = async () => {
+    if (!token || !selectedFood) {
+      return;
+    }
+
+    const foodId = selectedFood.id;
+    const isFavorite = favoriteFoodIds.has(foodId);
+
+    setTogglingFavoriteFoodId(foodId);
+    try {
+      if (isFavorite) {
+        await removeFavoriteFood(token, foodId);
+      } else {
+        await addFavoriteFood(token, foodId);
+      }
+      await favoriteFoodsQuery.refetch();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setTogglingFavoriteFoodId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -352,6 +385,18 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     <Text style={s.selectedChipSubText} numberOfLines={1}>{selectedFood.brandOrPlace}</Text>
                   ) : null}
                 </View>
+                <Pressable
+                  onPress={onToggleSelectedFoodFavorite}
+                  disabled={togglingFavoriteFoodId === selectedFood.id}
+                  style={({ pressed }) => [s.favoriteBtn, pressed && s.pressed, togglingFavoriteFoodId === selectedFood.id && s.favoriteBtnDisabled]}
+                  accessibilityLabel={favoriteFoodIds.has(selectedFood.id) ? "Remove from favorites" : "Add to favorites"}
+                >
+                  <Ionicons
+                    name={favoriteFoodIds.has(selectedFood.id) ? "star" : "star-outline"}
+                    size={18}
+                    color={favoriteFoodIds.has(selectedFood.id) ? "#ca8a04" : "#6b7280"}
+                  />
+                </Pressable>
                 <Pressable
                   onPress={() => {
                     setSelectedFood(null);
@@ -690,6 +735,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   clearBtnText: { fontSize: 13, color: "#166534", fontWeight: "700", lineHeight: 16 },
+  favoriteBtn: {
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favoriteBtnDisabled: {
+    opacity: 0.5,
+  },
 
   row: { flexDirection: "row", gap: 10, alignItems: "center" },
   gramsInput: { flex: 1 },

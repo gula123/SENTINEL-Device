@@ -25,13 +25,16 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog, useDeleteFoodLog, useFoodLogs, useUpdateFoodLog } from "../../hooks/useFoodDiary";
+import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import { useUserSettings } from "../../hooks/useUserSettings";
 import {
+  addFavoriteFood,
   createFoodPortion,
   createCustomFood,
   estimateFoodPer100gWithAi,
   fetchFoodPortions,
   fetchPortionTypes,
+  removeFavoriteFood,
   type PortionDto,
   type PortionTypeDto,
   searchFoods,
@@ -114,9 +117,11 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const updateMutation = useUpdateFoodLog(date);
   const deleteMutation = useDeleteFoodLog(date);
   const logsQuery = useFoodLogs(date);
+  const favoriteFoodsQuery = useFavoriteFoods(200, { enabled: Boolean(token) });
   const settingsQuery = useUserSettings();
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editingGrams, setEditingGrams] = useState("");
+  const [togglingFavoriteFoodId, setTogglingFavoriteFoodId] = useState<number | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,6 +153,11 @@ export default function LogFoodScreen({ route, navigation }: Props) {
   const currentMealLogs = useMemo(
     () => (logsQuery.data || []).filter((item) => (item.mealType || "SNACKS") === meal),
     [logsQuery.data, meal]
+  );
+
+  const favoriteFoodIds = useMemo(
+    () => new Set((favoriteFoodsQuery.data || []).map((f) => f.id)),
+    [favoriteFoodsQuery.data]
   );
 
   const consumed = useMemo(() => {
@@ -555,6 +565,27 @@ export default function LogFoodScreen({ route, navigation }: Props) {
     );
   };
 
+  const onToggleLoggedFoodFavorite = async (foodId: number | undefined) => {
+    if (!token || !foodId) {
+      return;
+    }
+
+    const isFavorite = favoriteFoodIds.has(foodId);
+    setTogglingFavoriteFoodId(foodId);
+    try {
+      if (isFavorite) {
+        await removeFavoriteFood(token, foodId);
+      } else {
+        await addFavoriteFood(token, foodId);
+      }
+      await favoriteFoodsQuery.refetch();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setTogglingFavoriteFoodId(null);
+    }
+  };
+
   const onAiEstimate = async () => {
     if (!customName.trim()) { Alert.alert("Enter a food name first."); return; }
     try { await aiMutation.mutateAsync(customName.trim()); }
@@ -671,6 +702,9 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                 {currentMealLogs.map((item, index) => {
                   const isEditing = editingLogId === item.id;
                   const isLast = index === currentMealLogs.length - 1;
+                  const hasFoodId = typeof item.foodId === "number";
+                  const isFavorite = hasFoodId ? favoriteFoodIds.has(item.foodId as number) : false;
+                  const isFavoriteLoading = hasFoodId && togglingFavoriteFoodId === item.foodId;
 
                   return (
                     <View key={item.id} style={[isEditing ? s.foodEntryExpanded : s.foodEntry, !isLast && !isEditing && s.foodEntryBorder]}>
@@ -682,7 +716,21 @@ export default function LogFoodScreen({ route, navigation }: Props) {
                           <Text style={isEditing ? [s.resultName, s.resultNameExpanded] : s.resultName}>{item.foodName} ({Math.round(item.grams)}g)</Text>
                           {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
                         </View>
-                        <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
+                        <View style={s.resultRightCol}>
+                          <Text style={s.resultMeta}>{Math.round(item.calories)} kcal</Text>
+                          {hasFoodId ? (
+                            <Pressable
+                              onPress={async (e) => {
+                                e.stopPropagation();
+                                await onToggleLoggedFoodFavorite(item.foodId);
+                              }}
+                              disabled={Boolean(isFavoriteLoading)}
+                              style={[s.favoriteBtn, isFavoriteLoading && s.favoriteBtnDisabled]}
+                            >
+                              <Ionicons name={isFavorite ? "star" : "star-outline"} size={16} color={isFavorite ? "#ca8a04" : "#6b7280"} />
+                            </Pressable>
+                          ) : null}
+                        </View>
                       </Pressable>
 
                       {isEditing ? (
@@ -890,6 +938,14 @@ const s = StyleSheet.create({
   resultNameExpanded: { color: "#166534", fontWeight: "600" },
   resultSubmeta: { fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: "500" },
   resultMeta: { fontSize: 12, color: "#9ca3af" },
+  resultRightCol: { flexDirection: "row", alignItems: "center", gap: 8 },
+  favoriteBtn: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favoriteBtnDisabled: { opacity: 0.5 },
 
   foodEntry: { backgroundColor: "#fff" },
   foodEntryExpanded: { backgroundColor: "#f0fdf4" },

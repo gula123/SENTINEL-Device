@@ -5,13 +5,14 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useFrequentFoods } from "../../hooks/useFrequentFoods";
+import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import { FrequentFoodsSection } from "../../components/FrequentFoodsSection";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Animated, Alert } from "react-native";
-import { fetchFoodPortions, type FoodItem } from "../../services/food/foodLogsApi";
+import { addFavoriteFood, fetchFoodPortions, removeFavoriteFood, type FoodItem } from "../../services/food/foodLogsApi";
 
 const MEAL_LABEL: Record<string, string> = {
   BREAKFAST: "Breakfast",
@@ -27,13 +28,17 @@ const MEAL_ICON: Record<string, string> = {
 };
 
 type Props = NativeStackScreenProps<MainStackParamList, "AddFood">;
+type FoodQuickSection = "favorites" | "frequent";
 
 export default function AddFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
   const frequentFoodsQuery = useFrequentFoods(100, { enabled: false });
+  const favoriteFoodsQuery = useFavoriteFoods(100, { enabled: false });
   const { token, signOut } = useAuth();
   const { t } = useLanguage();
   const addMutation = useAddFoodLog(date);
+  const [togglingFavoriteFoodId, setTogglingFavoriteFoodId] = useState<number | null>(null);
+  const [activeSection, setActiveSection] = useState<FoodQuickSection>("frequent");
 
   useFocusEffect(
     useCallback(() => {
@@ -41,7 +46,18 @@ export default function AddFoodScreen({ route, navigation }: Props) {
         return;
       }
       frequentFoodsQuery.refetch();
+      favoriteFoodsQuery.refetch();
     }, [token])
+  );
+
+  const favoriteFoodIds = useMemo(
+    () => new Set((favoriteFoodsQuery.data || []).map((f) => f.id)),
+    [favoriteFoodsQuery.data]
+  );
+
+  const frequentFoods = useMemo(
+    () => frequentFoodsQuery.data || [],
+    [frequentFoodsQuery.data]
   );
 
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -91,6 +107,27 @@ export default function AddFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const onToggleFavoriteFood = async (foodId: number, isFavorite: boolean) => {
+    if (!token) {
+      return;
+    }
+
+    setTogglingFavoriteFoodId(foodId);
+    try {
+      if (isFavorite) {
+        await removeFavoriteFood(token, foodId);
+      } else {
+        await addFavoriteFood(token, foodId);
+      }
+
+      await Promise.all([favoriteFoodsQuery.refetch(), frequentFoodsQuery.refetch()]);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setTogglingFavoriteFoodId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -134,12 +171,52 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           </View>
 
           <View style={s.card}>
-            <FrequentFoodsSection
-              foods={frequentFoodsQuery.data}
-              isLoading={frequentFoodsQuery.isLoading}
-              onLoadPortions={onLoadFrequentFoodPortions}
-              onAddFood={onAddFrequentFood}
-            />
+            <View style={s.tabsRow}>
+              <Pressable
+                onPress={() => setActiveSection("frequent")}
+                style={[s.tabBtn, activeSection === "frequent" && s.tabBtnActive]}
+              >
+                <Text style={[s.tabBtnText, activeSection === "frequent" && s.tabBtnTextActive]}>
+                  {t("addFood.frequentlyLoggedTitle")}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setActiveSection("favorites")}
+                style={[s.tabBtn, activeSection === "favorites" && s.tabBtnActive]}
+              >
+                <Text style={[s.tabBtnText, activeSection === "favorites" && s.tabBtnTextActive]}>
+                  {t("addFood.favoritesTitle")}
+                </Text>
+              </Pressable>
+            </View>
+
+            {activeSection === "favorites" ? (
+              <FrequentFoodsSection
+                title={t("addFood.favoritesTitle")}
+                emptyText={t("addFood.noFavorites")}
+                foods={favoriteFoodsQuery.data}
+                isLoading={favoriteFoodsQuery.isLoading}
+                onLoadPortions={onLoadFrequentFoodPortions}
+                onAddFood={onAddFrequentFood}
+                favoriteFoodIds={favoriteFoodIds}
+                onToggleFavorite={onToggleFavoriteFood}
+                togglingFavoriteFoodId={togglingFavoriteFoodId}
+                actionIconMode="remove"
+              />
+            ) : (
+              <FrequentFoodsSection
+                title={t("addFood.frequentlyLoggedTitle")}
+                emptyText={t("addFood.noFrequentlyLogged")}
+                foods={frequentFoods}
+                isLoading={frequentFoodsQuery.isLoading}
+                onLoadPortions={onLoadFrequentFoodPortions}
+                onAddFood={onAddFrequentFood}
+                favoriteFoodIds={favoriteFoodIds}
+                onToggleFavorite={onToggleFavoriteFood}
+                togglingFavoriteFoodId={togglingFavoriteFoodId}
+                actionIconMode="star"
+              />
+            )}
           </View>
         </ScrollView>
 
@@ -215,6 +292,32 @@ const s = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+  },
+
+  tabsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 10,
+    backgroundColor: "#f9fafb",
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  tabBtnActive: {
+    borderColor: "#16a34a",
+    backgroundColor: "#dcfce7",
+  },
+  tabBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  tabBtnTextActive: {
+    color: "#166534",
   },
 
   actionsCard: {

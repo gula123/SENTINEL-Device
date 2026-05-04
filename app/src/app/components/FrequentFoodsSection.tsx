@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -11,6 +12,12 @@ interface FrequentFoodsSectionProps {
   isLoading: boolean;
   onLoadPortions: (foodId: number) => Promise<PortionDto[]>;
   onAddFood: (food: FoodItem, grams: number) => Promise<void>;
+  title?: string;
+  emptyText?: string;
+  favoriteFoodIds?: ReadonlySet<number>;
+  onToggleFavorite?: (foodId: number, isFavorite: boolean) => Promise<void>;
+  togglingFavoriteFoodId?: number | null;
+  actionIconMode?: "star" | "remove";
 }
 
 const s = StyleSheet.create({
@@ -74,6 +81,31 @@ const s = StyleSheet.create({
   resultMeta: {
     fontSize: 12,
     color: "#9ca3af",
+  },
+  resultRightCol: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  favoriteBtn: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favoriteBtnActive: {
+    opacity: 1,
+  },
+  favoriteBtnDisabled: {
+    opacity: 0.5,
+  },
+  favoriteBtnText: {
+    fontSize: 18,
+    color: "#6b7280",
+    lineHeight: 20,
+  },
+  favoriteBtnTextActive: {
+    color: "#ca8a04",
   },
   expandContent: {
     paddingHorizontal: 10,
@@ -190,6 +222,12 @@ export function FrequentFoodsSection({
   isLoading,
   onLoadPortions,
   onAddFood,
+  title = "Frequently Logged",
+  emptyText = "No frequently logged foods yet.",
+  favoriteFoodIds,
+  onToggleFavorite,
+  togglingFavoriteFoodId = null,
+  actionIconMode = "star",
 }: FrequentFoodsSectionProps) {
   const allFoods = useMemo(() => foods || [], [foods]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -290,7 +328,7 @@ export function FrequentFoodsSection({
   if (isLoading) {
     return (
       <View style={s.container}>
-        <Text style={s.title}>Frequently Logged</Text>
+        <Text style={s.title}>{title}</Text>
         <View style={s.loadingContainer}>
           <ActivityIndicator size="small" color="#16a34a" />
         </View>
@@ -301,15 +339,15 @@ export function FrequentFoodsSection({
   if (!displayFoods || displayFoods.length === 0) {
     return (
       <View style={s.container}>
-        <Text style={s.title}>Frequently Logged</Text>
-        <Text style={s.emptyText}>No frequently logged foods yet.</Text>
+        <Text style={s.title}>{title}</Text>
+        <Text style={s.emptyText}>{emptyText}</Text>
       </View>
     );
   }
 
   return (
     <View style={s.container}>
-      <Text style={s.title}>Frequently Logged</Text>
+      <Text style={s.title}>{title}</Text>
       <View style={s.results}>
         <FlatList
           data={displayFoods}
@@ -334,6 +372,11 @@ export function FrequentFoodsSection({
             const fats = Math.round(food.fats * factor * 10) / 10;
             const isAdding = addingFoodId === food.id;
             const isLast = index === displayFoods.length - 1;
+            const isFavorite = Boolean(favoriteFoodIds?.has(food.id));
+            const isFavoriteLoading = togglingFavoriteFoodId === food.id;
+            const usesRemoveIcon = actionIconMode === "remove";
+            const iconName = usesRemoveIcon ? "trash-outline" : (isFavorite ? "star" : "star-outline");
+            const iconColor = usesRemoveIcon ? "#b91c1c" : (isFavorite ? "#ca8a04" : "#6b7280");
 
             return (
               <View style={[s.foodEntry, isExpanded && s.foodEntryExpanded, !isLast && !isExpanded && s.foodEntryBorder]}>
@@ -345,7 +388,21 @@ export function FrequentFoodsSection({
                     <Text style={[s.resultName, isExpanded && s.resultNameExpanded]} numberOfLines={1}>{food.name}</Text>
                     {food.brandOrPlace ? <Text style={s.resultSubmeta} numberOfLines={1}>{food.brandOrPlace}</Text> : null}
                   </View>
-                  <Text style={s.resultMeta}>{Math.round(food.calories)} kcal</Text>
+                  <View style={s.resultRightCol}>
+                    <Text style={s.resultMeta}>{Math.round(food.calories)} kcal</Text>
+                    {onToggleFavorite ? (
+                      <Pressable
+                        onPress={async (e) => {
+                          e.stopPropagation();
+                          await onToggleFavorite(food.id, usesRemoveIcon ? true : isFavorite);
+                        }}
+                        disabled={isFavoriteLoading}
+                        style={[s.favoriteBtn, isFavorite && s.favoriteBtnActive, isFavoriteLoading && s.favoriteBtnDisabled]}
+                      >
+                        <Ionicons name={iconName} size={16} color={iconColor} />
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </Pressable>
 
                 {isExpanded ? (

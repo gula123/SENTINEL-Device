@@ -333,6 +333,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "addFood.createSubtitle": "Add a custom food entry",
     "addFood.backToMeal": "Back to Meal Statistics",
     "addFood.added": "Added {name} ({grams}g)",
+    "addFood.favoritesTitle": "Favorites",
+    "addFood.noFavorites": "No favorite foods yet.",
+    "addFood.frequentlyLoggedTitle": "Frequently Logged",
+    "addFood.noFrequentlyLogged": "No frequently logged foods yet.",
 
     // Create Food
     "createFood.title": "Create Food",
@@ -756,6 +760,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "addFood.createSubtitle": "Egyéni étel bejegyzés hozzáadása",
     "addFood.backToMeal": "Vissza az étkezési statisztikákhoz",
     "addFood.added": "Hozzáadva: {name} ({grams}g)",
+    "addFood.favoritesTitle": "Kedvencek",
+    "addFood.noFavorites": "Még nincsenek kedvenc ételek.",
+    "addFood.frequentlyLoggedTitle": "Gyakran naplózott",
+    "addFood.noFrequentlyLogged": "Még nincsenek gyakran naplózott ételek.",
 
     // Étel létrehozása
     "createFood.title": "Étel létrehozása",

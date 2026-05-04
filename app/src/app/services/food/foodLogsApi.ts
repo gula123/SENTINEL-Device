@@ -272,3 +272,50 @@ export const fetchFrequentFoods = async (token: string, limit: number = 10): Pro
       source: item.source,
     }));
 };
+
+export const fetchFavoriteFoods = async (token: string, limit: number = 20): Promise<FoodItem[]> => {
+  const response = await authenticatedFetch(`/food/favorites?limit=${limit}`, token, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to fetch favorite foods (${response.status})`);
+  }
+
+  const items: BackendFoodItem[] = await response.json();
+  return items
+    .filter((item) => !item.name.toLowerCase().startsWith("quick fill "))
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      brandOrPlace: item.brandOrPlace || undefined,
+      calories: item.caloriesPer100g,
+      protein: item.proteinPer100g,
+      carbs: item.carbsPer100g,
+      fats: item.fatsPer100g,
+      source: item.source,
+    }));
+};
+
+export const addFavoriteFood = async (token: string, foodId: number): Promise<void> => {
+  const response = await authenticatedFetch(`/food/favorites/${foodId}`, token, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to add favorite food (${response.status})`);
+  }
+};
+
+export const removeFavoriteFood = async (token: string, foodId: number): Promise<void> => {
+  const response = await authenticatedFetch(`/food/favorites/${foodId}`, token, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to remove favorite food (${response.status})`);
+  }
+};
