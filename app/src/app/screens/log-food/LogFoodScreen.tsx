@@ -66,19 +66,36 @@ const mealKeyByType = {
   SNACKS: "snacks",
 } as const;
 
-const LIMIT_OK_COLOR = "#16a34a";
-const LIMIT_BAD_COLOR = "#dc2626";
+const LIMIT_COLOR = {
+  perfect: "#16a34a", // under limit (usual green)
+  good: "#4ade80",    // slight over (or slight under for inverse metrics), light green like calendar
+  warning: "#eab308", // yellow zone
+  caution: "#f97316", // orange zone
+  exceeded: "#b91c1c", // significantly out of range
+};
 
 function resolveLimitColor(value: number, limit: number, invert = false): string {
   if (!Number.isFinite(limit) || limit <= 0) {
-    return LIMIT_OK_COLOR;
+    return LIMIT_COLOR.good;
   }
 
-  if (invert) {
-    return value >= limit ? LIMIT_OK_COLOR : LIMIT_BAD_COLOR;
+  const ratio = value / limit;
+
+  // Normal metrics (calories, carbs, fats): lower is better, slight overshoot is still green.
+  if (!invert) {
+    if (ratio < 1.0) return LIMIT_COLOR.perfect;
+    if (ratio <= 1.08) return LIMIT_COLOR.good;
+    if (ratio <= 1.15) return LIMIT_COLOR.warning;
+    if (ratio <= 1.25) return LIMIT_COLOR.caution;
+    return LIMIT_COLOR.exceeded;
   }
 
-  return value > limit ? LIMIT_BAD_COLOR : LIMIT_OK_COLOR;
+  // Inverse metrics (protein): meeting/exceeding target is best.
+  if (ratio >= 1.0) return LIMIT_COLOR.perfect;
+  if (ratio >= 0.92) return LIMIT_COLOR.good;
+  if (ratio >= 0.85) return LIMIT_COLOR.warning;
+  if (ratio >= 0.75) return LIMIT_COLOR.caution;
+  return LIMIT_COLOR.exceeded;
 }
 
 type Props = NativeStackScreenProps<MainStackParamList, "LogFood">;

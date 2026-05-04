@@ -21,19 +21,36 @@ import { getMealLabel } from "../../utils/i18n";
 const MEAL_ORDER: MealType[] = ["BREAKFAST", "LUNCH", "DINNER", "SNACKS"];
 const MEAL_LABEL: Record<MealType, string> = { BREAKFAST: "Breakfast", LUNCH: "Lunch", DINNER: "Dinner", SNACKS: "Snacks" };
 const MEAL_ICON: Record<MealType, string> = { BREAKFAST: "☀️", LUNCH: "🌤️", DINNER: "🌙", SNACKS: "🍎" };
-const LIMIT_OK_COLOR = "#16a34a";
-const LIMIT_BAD_COLOR = "#dc2626";
+const LIMIT_COLOR = {
+  perfect: "#16a34a", // under limit (usual green)
+  good: "#4ade80",    // slight over (or slight under for inverse metrics), light green like calendar
+  warning: "#eab308", // yellow zone
+  caution: "#f97316", // orange zone
+  exceeded: "#f70808", // significantly out of range (calendar red box tone)
+};
 
 function resolveLimitColor(value: number, limit: number, invert = false): string {
-  if (limit <= 0) {
-    return LIMIT_OK_COLOR;
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return LIMIT_COLOR.good;
   }
 
-  if (invert) {
-    return value >= limit ? LIMIT_OK_COLOR : LIMIT_BAD_COLOR;
+  const ratio = value / limit;
+
+  // Normal metrics (calories, carbs, fats): lower is better, slight overshoot is still green.
+  if (!invert) {
+    if (ratio < 1.0) return LIMIT_COLOR.perfect;
+    if (ratio <= 1.08) return LIMIT_COLOR.good;
+    if (ratio <= 1.15) return LIMIT_COLOR.warning;
+    if (ratio <= 1.25) return LIMIT_COLOR.caution;
+    return LIMIT_COLOR.exceeded;
   }
 
-  return value > limit ? LIMIT_BAD_COLOR : LIMIT_OK_COLOR;
+  // Inverse metrics (protein): meeting/exceeding target is best.
+  if (ratio >= 1.0) return LIMIT_COLOR.perfect;
+  if (ratio >= 0.92) return LIMIT_COLOR.good;
+  if (ratio >= 0.85) return LIMIT_COLOR.warning;
+  if (ratio >= 0.75) return LIMIT_COLOR.caution;
+  return LIMIT_COLOR.exceeded;
 }
 
 function MacroCard({ label, value, limit, invertColorByLimit = false }: { label: string; value: number; limit: number; invertColorByLimit?: boolean }) {
@@ -87,7 +104,7 @@ function MealSummaryCard({ meal, items, limits, calLimit, onLogPress, mealLabel 
         <Text style={styles.mealName}>{mealLabel}</Text>
         <View style={styles.mealCalBlock}>
           <Text style={[styles.mealCal, { color: calColor }]}>
-            {hasCalorieLimit ? `${calLimit} / ${Math.round(totalCal)}` : `${Math.round(totalCal)}`} kcal
+            {hasCalorieLimit ? `${Math.round(totalCal)} / ${calLimit}` : `${Math.round(totalCal)}`} kcal
           </Text>
           {hasCalorieLimit ? (
             <View style={styles.mealCalTrack}>
@@ -242,7 +259,7 @@ function DayView({
   const calorieGoal = summary ? summary.caloriesConsumed + summary.caloriesRemaining : 0;
   const calorieProgress = calorieGoal > 0 ? summary!.caloriesConsumed / calorieGoal : 0;
   const calorieProgressBar = Math.min(1, calorieProgress);
-  const calorieColor = summary ? resolveLimitColor(summary.caloriesConsumed, calorieGoal) : LIMIT_OK_COLOR;
+  const calorieColor = summary ? resolveLimitColor(summary.caloriesConsumed, calorieGoal) : LIMIT_COLOR.good;
 
   return (
     <ScrollView
