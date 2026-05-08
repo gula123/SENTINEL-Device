@@ -277,18 +277,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     setPortionAmount("1");
   };
 
-  const onAiEstimate = async () => {
-    if (!customName.trim()) {
-      Alert.alert("Enter a food name first.");
-      return;
-    }
-    try {
-      await aiMutation.mutateAsync(customName.trim());
-    } catch (err) {
-      handleError(err);
-    }
-  };
-
   const availablePortionTypes = useMemo(() => {
     return portionTypes.filter((type) =>
       !portions.some((portion) => (portion.portionTypeCode || "").toLowerCase() === type.code.toLowerCase())

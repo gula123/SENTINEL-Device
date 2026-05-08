@@ -10,6 +10,20 @@ Smoke checklist: [MOBILE_SMOKE_TEST_CHECKLIST.md](MOBILE_SMOKE_TEST_CHECKLIST.md
 - Start Expo: `npm run start`
 - Run Android: `npm run android`
 - Run iOS (macOS only): `npm run ios`
+- PR quality scripts:
+  - `npm run test`
+  - `npm run coverage`
+  - `npm run typecheck`
+
+## Mobile PR quality gate contract
+
+- Workflow: `.github/workflows/pull-request-device-quality-gate.yml`
+- Required status-check job name: `device-quality-gate`
+- Stricter scoped thresholds are enforced for:  
+  `RootNavigator.tsx`, `services/api/client.ts`, `services/auth/authApi.ts`, `services/auth/nativeGoogleSession.ts`, `config/env.ts`
+- Staged global thresholds are explicitly configured in `app/package.json` for the broader mobile auth/provider/login scope while the suite grows.
+- Emulator/device smoke validation is intentionally **not** part of the required PR gate; keep it in manual/scheduled smoke workflows until proven stable.
+- Branch protection is a manual GitHub setting: after this workflow exists, enable `device-quality-gate` as a required status check in repository branch protection rules.
 
 ## Environment variables (app/.env)
 

@@ -6,7 +6,11 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "coverage": "jest --coverage --runInBand",
+    "typecheck": "tsc --noEmit -p tsconfig.quality-gate.json"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -32,8 +36,67 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "jest": "^29.7.0",
+    "jest-expo": "^55.0.7",
+    "react-test-renderer": "^19.2.0",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/app/state/AuthContext.tsx",
+      "src/app/providers/AppProviders.tsx",
+      "src/app/navigation/RootNavigator.tsx",
+      "src/app/services/api/client.ts",
+      "src/app/services/auth/authApi.ts",
+      "src/app/services/auth/nativeGoogleSession.ts",
+      "src/app/screens/auth/LoginScreen.tsx",
+      "src/app/config/env.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 30,
+        "functions": 70,
+        "lines": 60,
+        "statements": 60
+      },
+      "./src/app/navigation/RootNavigator.tsx": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/app/services/api/client.ts": {
+        "branches": 85,
+        "functions": 100,
+        "lines": 95,
+        "statements": 95
+      },
+      "./src/app/services/auth/authApi.ts": {
+        "branches": 80,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/app/services/auth/nativeGoogleSession.ts": {
+        "branches": 80,
+        "functions": 100,
+        "lines": 90,
+        "statements": 90
+      },
+      "./src/app/config/env.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      }
+    }
+  }
 }

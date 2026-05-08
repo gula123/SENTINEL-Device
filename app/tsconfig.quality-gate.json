@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/app/state/AuthContext.tsx",
+    "src/app/providers/AppProviders.tsx",
+    "src/app/navigation/RootNavigator.tsx",
+    "src/app/services/api/client.ts",
+    "src/app/services/auth/authApi.ts",
+    "src/app/services/auth/nativeGoogleSession.ts",
+    "src/app/screens/auth/LoginScreen.tsx",
+    "src/app/config/env.ts"
+  ]
+}
