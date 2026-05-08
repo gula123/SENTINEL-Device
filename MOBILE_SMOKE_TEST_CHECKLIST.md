@@ -2,6 +2,8 @@
 
 Last updated: 2026-03-09
 
+> This checklist is for manual/device smoke validation and is not a required pull-request branch-protection check.
+
 ## 1) Environment
 
 - Backend running and reachable from device/emulator
