@@ -10,6 +10,8 @@ jobs:
   device-quality-gate:
     name: device-quality-gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: app
