@@ -3,7 +3,9 @@ import MainTabs from "./MainTabs";
 import LogFoodScreen from "../screens/log-food/LogFoodScreen";
 import AddFoodScreen from "../screens/add-food/AddFoodScreen";
 import SearchFoodScreen from "../screens/search-food/SearchFoodScreen";
+import SearchMealFoodScreen from "../screens/search-meal-food/SearchMealFoodScreen";
 import CreateFoodScreen from "../screens/create-food/CreateFoodScreen";
+import MealDetailScreen from "../screens/meal-detail/MealDetailScreen";
 import HabitInsightsScreen from "../screens/habits/HabitInsightsScreen";
 import type { MainStackParamList } from "./navigationTypes";
 
@@ -27,6 +29,11 @@ export default function MainStack() {
         options={{ presentation: "modal", headerShown: false }}
       />
       <Stack.Screen
+        name="SearchMealFood"
+        component={SearchMealFoodScreen}
+        options={{ presentation: "modal", headerShown: false }}
+      />
+      <Stack.Screen
         name="AddFood"
         component={AddFoodScreen}
         options={{ presentation: "modal", headerShown: false }}
@@ -36,6 +43,11 @@ export default function MainStack() {
         component={CreateFoodScreen}
         options={{ presentation: "modal", headerShown: false }}
       />
+        <Stack.Screen
+          name="MealDetail"
+          component={MealDetailScreen}
+          options={{ presentation: "modal", headerShown: false }}
+        />
     </Stack.Navigator>
   );
 }

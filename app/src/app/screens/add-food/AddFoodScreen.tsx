@@ -8,6 +8,9 @@ import { useFrequentFoods } from "../../hooks/useFrequentFoods";
 import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import { FrequentFoodsSection } from "../../components/FrequentFoodsSection";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
+import { useSavedMeals, useLogSavedMeal, useReorderSavedMeals } from "../../hooks/useSavedMeals";
+import { SavedMealsSection } from "../../components/SavedMealsSection";
+import type { SavedMealDto } from "../../services/food/savedMealsApi";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -28,7 +31,7 @@ const MEAL_ICON: Record<string, string> = {
 };
 
 type Props = NativeStackScreenProps<MainStackParamList, "AddFood">;
-type FoodQuickSection = "favorites" | "frequent";
+type FoodQuickSection = "favorites" | "frequent" | "meals";
 
 export default function AddFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
@@ -39,6 +42,9 @@ export default function AddFoodScreen({ route, navigation }: Props) {
   const addMutation = useAddFoodLog(date);
   const [togglingFavoriteFoodId, setTogglingFavoriteFoodId] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<FoodQuickSection>("frequent");
+  const savedMealsQuery = useSavedMeals();
+  const logSavedMealMutation = useLogSavedMeal(date);
+  const reorderSavedMealsMutation = useReorderSavedMeals();
 
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +55,30 @@ export default function AddFoodScreen({ route, navigation }: Props) {
       favoriteFoodsQuery.refetch();
     }, [token])
   );
+  const onLogSavedMeal = async (mealId: number) => {
+    try {
+      await logSavedMealMutation.mutateAsync({ mealId, mealType: meal });
+      showToast("Meal logged!");
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
+  const onEditMeal = (savedMeal: SavedMealDto) => {
+    navigation.navigate("MealDetail", { meal, date, editMealId: savedMeal.id });
+  };
+
+  const onCreateMeal = () => {
+    navigation.navigate("MealDetail", { meal, date });
+  };
+
+  const onReorderMeals = async (mealIds: number[]) => {
+    try {
+      await reorderSavedMealsMutation.mutateAsync(mealIds);
+    } catch (err) {
+      handleError(err);
+    }
+  };
 
   const favoriteFoodIds = useMemo(
     () => new Set((favoriteFoodsQuery.data || []).map((f) => f.id)),
@@ -188,9 +218,26 @@ export default function AddFoodScreen({ route, navigation }: Props) {
                   {t("addFood.favoritesTitle")}
                 </Text>
               </Pressable>
+              <Pressable
+                onPress={() => setActiveSection("meals")}
+                style={[s.tabBtn, activeSection === "meals" && s.tabBtnActive]}
+              >
+                <Text style={[s.tabBtnText, activeSection === "meals" && s.tabBtnTextActive]}>
+                  {t("addFood.mealsTitle")}
+                </Text>
+              </Pressable>
             </View>
 
-            {activeSection === "favorites" ? (
+            {activeSection === "meals" ? (
+              <SavedMealsSection
+                meals={savedMealsQuery.data}
+                isLoading={savedMealsQuery.isLoading}
+                onLogMeal={onLogSavedMeal}
+                onEditMeal={onEditMeal}
+                onCreateMeal={onCreateMeal}
+                onReorderMeals={onReorderMeals}
+              />
+            ) : activeSection === "favorites" ? (
               <FrequentFoodsSection
                 title={t("addFood.favoritesTitle")}
                 emptyText={t("addFood.noFavorites")}
