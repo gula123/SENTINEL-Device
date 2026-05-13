@@ -31,6 +31,7 @@ import {
   type FoodItem,
   type MealType,
 } from "../../services/food/foodLogsApi";
+import { searchRecipes, logRecipe, type RecipeDto } from "../../services/food/recipesApi";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 
@@ -58,6 +59,9 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const [selectedPortionId, setSelectedPortionId] = useState<number | null>(null);
   const [results, setResults] = useState<FoodItem[]>([]);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [recipeResults, setRecipeResults] = useState<RecipeDto[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeDto | null>(null);
+  const [loggingRecipe, setLoggingRecipe] = useState(false);
   const [portions, setPortions] = useState<PortionDto[]>([]);
   const [portionTypes, setPortionTypes] = useState<PortionTypeDto[]>([]);
   const [showAddPortionForm, setShowAddPortionForm] = useState(false);
@@ -186,9 +190,13 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     const runSearch = async () => {
       try {
         setSearching(true);
-        const foods = await searchFoods(token, debouncedQuery);
+        const [foods, recipes] = await Promise.all([
+          searchFoods(token, debouncedQuery),
+          searchRecipes(token, debouncedQuery),
+        ]);
         if (!cancelled) {
-          setResults(foods.slice(0, 8));
+          setResults(foods.slice(0, 6));
+          setRecipeResults(recipes.slice(0, 4));
         }
       } catch (err) {
         if (!cancelled) {
@@ -211,6 +219,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const onSearch = (text: string) => {
     setQuery(text);
     setSelectedFood(null);
+    setSelectedRecipe(null);
     setSelectedPortionId(null);
     setPortionAmount("1");
     setPortions([]);
@@ -219,12 +228,37 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     setNewPortionGrams("100");
     if (text.trim().length < 2) {
       setResults([]);
+      setRecipeResults([]);
       setSearching(false);
     }
   };
 
   const onAdd = async () => {
     const g = resolvedGrams;
+    if (selectedRecipe) {
+      if (!Number.isFinite(g) || g <= 0) {
+        Alert.alert(t("searchFood.invalidGrams"), t("searchFood.positiveNumber"));
+        return;
+      }
+      if (!token) return;
+      setLoggingRecipe(true);
+      try {
+        await logRecipe(token, { recipeId: selectedRecipe.id, grams: g, mealType: meal, logDate: route.params.date });
+        invalidate();
+        setQuery("");
+        setDebouncedQuery("");
+        setResults([]);
+        setRecipeResults([]);
+        setSelectedRecipe(null);
+        setGrams("100");
+        showToast(`${t("searchFood.addedTo")} ${t(`home.${meal.toLowerCase()}`)}`);
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoggingRecipe(false);
+      }
+      return;
+    }
     if (!selectedFood) {
       Alert.alert(t("searchFood.selectFood"), t("searchFood.searchFirst"));
       return;
@@ -244,6 +278,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       setQuery("");
       setDebouncedQuery("");
       setResults([]);
+      setRecipeResults([]);
       setSearching(false);
       setSelectedFood(null);
       setSelectedPortionId(null);
@@ -377,7 +412,27 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("searchFood.cardTitle")}</Text>
-              {selectedFood ? (
+              {selectedRecipe ? (
+              <View style={s.selectedChip}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedRecipe.name}</Text>
+                  <Text style={s.selectedChipSubText} numberOfLines={1}>{t("searchFood.recipeBy").replace("{owner}", selectedRecipe.ownerName)}</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setSelectedRecipe(null);
+                    setQuery("");
+                    setResults([]);
+                    setRecipeResults([]);
+                    setGrams("100");
+                  }}
+                  style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}
+                  accessibilityLabel="Clear selected recipe"
+                >
+                  <Text style={s.clearBtnText}>✕</Text>
+                </Pressable>
+              </View>
+              ) : selectedFood ? (
               <View style={s.selectedChip}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
@@ -402,6 +457,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     setSelectedFood(null);
                     setQuery("");
                     setResults([]);
+                    setRecipeResults([]);
                     setSelectedPortionId(null);
                     setPortionAmount("1");
                     setPortions([]);
@@ -429,15 +485,17 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
 
                 {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
 
-                {results.length > 0 ? (
+                {(results.length > 0 || recipeResults.length > 0) ? (
                   <View style={s.results}>
                     {results.map((item) => (
                       <Pressable
-                        key={item.id}
+                        key={`food-${item.id}`}
                         onPress={async () => {
                           setSelectedFood(item);
+                          setSelectedRecipe(null);
                           setQuery(item.name);
                           setResults([]);
+                          setRecipeResults([]);
                           setSelectedPortionId(null);
                           setPortionAmount("1");
                           setShowAddPortionForm(false);
@@ -458,12 +516,76 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                         <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
                       </Pressable>
                     ))}
+                    {recipeResults.map((recipe) => (
+                      <Pressable
+                        key={`recipe-${recipe.id}`}
+                        onPress={() => {
+                          setSelectedRecipe(recipe);
+                          setSelectedFood(null);
+                          setQuery(recipe.name);
+                          setResults([]);
+                          setRecipeResults([]);
+                          setGrams("100");
+                        }}
+                        style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
+                      >
+                        <View style={s.resultTextCol}>
+                          <Text style={s.resultName}>{recipe.name}</Text>
+                          <Text style={s.resultSubmeta}>{t("searchFood.recipeBy").replace("{owner}", recipe.ownerName)}</Text>
+                        </View>
+                        <Text style={s.resultMeta}>{Math.round(recipe.caloriesPer100g)} kcal/100g</Text>
+                      </Pressable>
+                    ))}
                   </View>
                 ) : null}
               </>
               )}
 
-              {selectedFoodPreview ? (
+              {selectedRecipe ? (() => {
+                const g = Number(grams);
+                const factor = Number.isFinite(g) && g > 0 ? g / 100 : 0;
+                const recipePreview = factor > 0 ? {
+                  grams: g,
+                  calories: Math.round(selectedRecipe.caloriesPer100g * factor),
+                  protein: Math.round(selectedRecipe.proteinPer100g * factor * 10) / 10,
+                  carbs: Math.round(selectedRecipe.carbsPer100g * factor * 10) / 10,
+                  fats: Math.round(selectedRecipe.fatsPer100g * factor * 10) / 10,
+                } : null;
+                return (
+                  <>
+                    {recipePreview ? (
+                      <View style={s.previewBox}>
+                        <Text style={s.previewTitle}>{t("searchFood.willAdd").replace("{grams}", String(recipePreview.grams))}</Text>
+                        <View style={s.previewRow}>
+                          <Text style={s.previewItem}>🔥 {recipePreview.calories} kcal</Text>
+                          <Text style={s.previewItem}>🥩 {recipePreview.protein}g P</Text>
+                          <Text style={s.previewItem}>🍚 {recipePreview.carbs}g C</Text>
+                          <Text style={s.previewItem}>🥑 {recipePreview.fats}g F</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                    <View style={s.row}>
+                      <TextInput
+                        value={grams}
+                        onChangeText={setGrams}
+                        keyboardType="numeric"
+                        placeholder={t("searchFood.grams")}
+                        placeholderTextColor="#9ca3af"
+                        style={[s.input, s.gramsInput]}
+                        returnKeyType="done"
+                      />
+                      <Pressable
+                        onPress={onAdd}
+                        disabled={loggingRecipe}
+                        style={({ pressed }) => [s.addBtn, loggingRecipe && s.addBtnDisabled, pressed && s.pressed]}
+                      >
+                        <Text style={s.addBtnText}>{loggingRecipe ? t("searchFood.adding") : t("searchFood.add")}</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                );
+              })() : selectedFoodPreview ? (
+              <>
               <View style={s.previewBox}>
                 <Text style={s.previewTitle}>
                   {selectedPortion
@@ -477,8 +599,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                   <Text style={s.previewItem}>🥑 {selectedFoodPreview.fats}g F</Text>
                 </View>
               </View>
-              ) : null}
-
               <View style={s.row}>
               <TextInput
                 value={selectedPortion ? portionAmount : grams}
@@ -497,6 +617,27 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 <Text style={s.addBtnText}>{addMutation.isPending ? t("searchFood.adding") : t("searchFood.add")}</Text>
               </Pressable>
               </View>
+              </>
+              ) : selectedFood ? (
+              <View style={s.row}>
+              <TextInput
+                value={selectedPortion ? portionAmount : grams}
+                onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
+                keyboardType="numeric"
+                placeholder={selectedPortion ? t("searchFood.amount") : t("searchFood.grams")}
+                placeholderTextColor="#9ca3af"
+                style={[s.input, s.gramsInput]}
+                returnKeyType="done"
+              />
+              <Pressable
+                onPress={onAdd}
+                disabled={addMutation.isPending}
+                style={({ pressed }) => [s.addBtn, addMutation.isPending && s.addBtnDisabled, pressed && s.pressed]}
+              >
+                <Text style={s.addBtnText}>{addMutation.isPending ? t("searchFood.adding") : t("searchFood.add")}</Text>
+              </Pressable>
+              </View>
+              ) : null}
 
               {selectedPortion ? (
               <Text style={s.portionAmountHint}>
@@ -504,7 +645,27 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
               </Text>
               ) : null}
 
-              {selectedFood && portions.length > 0 ? (
+              {selectedRecipe ? (
+              <>
+                <View style={s.portionWrap}>
+                  <Text style={s.portionLabel}>{t("searchFood.ingredientsFinalWeight").replace("{weight}", selectedRecipe.finalCookedWeightG ? `${Math.round(selectedRecipe.finalCookedWeightG)}g` : t("common.na"))}</Text>
+                  <View style={s.portionRow}>
+                    {(selectedRecipe.ingredients || []).map((ing, idx) => (
+                      <View key={idx} style={s.portionChip}>
+                        <Text style={s.portionChipText}>{ing.foodName || `Food #${ing.foodId}`} — {Math.round(ing.rawGrams)}g</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => navigation.navigate("CreateRecipe", { meal, date: route.params.date, recipe: selectedRecipe, isCopy: true })}
+                  style={({ pressed }) => [s.modifyRecipeBtn, pressed && s.pressed]}
+                >
+                  <Ionicons name="create-outline" size={15} color="#1d4ed8" style={{ marginRight: 4 }} />
+                  <Text style={s.modifyRecipeBtnText}>{t("searchFood.modifyRecipe")}</Text>
+                </Pressable>
+              </>
+              ) : selectedFood && portions.length > 0 ? (
               <View style={s.portionWrap}>
                 <Text style={s.portionLabel}>{t("searchFood.portions")}</Text>
                 <View style={s.portionRow}>
@@ -815,6 +976,20 @@ const s = StyleSheet.create({
   },
   addBtnDisabled: { backgroundColor: "#d1d5db" },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
+  modifyRecipeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  modifyRecipeBtnText: { fontSize: 13, color: "#1d4ed8", fontWeight: "600" },
 
   footer: {
     paddingHorizontal: 16,

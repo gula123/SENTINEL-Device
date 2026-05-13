@@ -17,12 +17,14 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { searchFoods, type FoodItem } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 import { setPendingRecipeFood } from "../../state/recipeFoodPicker";
 
 type Props = NativeStackScreenProps<MainStackParamList, "SearchRecipeFood">;
 
 export default function SearchRecipeFoodScreen({ navigation }: Props) {
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodItem[]>([]);
@@ -85,7 +87,7 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
-          <Text style={s.headerText}>Search Food</Text>
+          <Text style={s.headerText}>{t("recipes.searchIngredients")}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
@@ -94,7 +96,7 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
               <Ionicons name="search-outline" size={16} color="#9ca3af" style={s.searchIcon} />
               <TextInput
                 style={s.searchInput}
-                placeholder="Search foods..."
+                placeholder={t("searchFood.placeholder")}
                 placeholderTextColor="#9ca3af"
                 value={query}
                 onChangeText={setQuery}
@@ -104,7 +106,7 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
             </View>
 
             {debouncedQuery.trim().length >= 2 && results.length === 0 && !searching ? (
-              <Text style={s.emptyText}>No results found.</Text>
+              <Text style={s.emptyText}>{t("searchFood.noResults")}</Text>
             ) : null}
 
             {results.length > 0 ? (

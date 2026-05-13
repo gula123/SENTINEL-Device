@@ -162,7 +162,7 @@ export function RecipesSection({
                       }}
                       style={s.favoriteBtn}
                     >
-                      <Ionicons name="pencil-outline" size={16} color="#6b7280" />
+                      <Ionicons name="ellipsis-vertical" size={16} color="#6b7280" />
                     </Pressable>
                   </View>
                 </Pressable>

@@ -52,6 +52,16 @@ export async function fetchMyRecipes(token: string): Promise<RecipeDto[]> {
   return response.json();
 }
 
+export async function searchRecipes(token: string, query: string): Promise<RecipeDto[]> {
+  if (query.trim().length < 2) return [];
+  const response = await authenticatedFetch(`/recipes/search?q=${encodeURIComponent(query)}`, token, { method: "GET" });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Recipe search failed (${response.status})`);
+  }
+  return response.json();
+}
+
 export async function fetchRecipe(token: string, recipeId: number): Promise<RecipeDto> {
   const response = await authenticatedFetch(`/recipes/${recipeId}`, token, { method: "GET" });
   if (!response.ok) {

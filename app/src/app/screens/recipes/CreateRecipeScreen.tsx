@@ -18,7 +18,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAuth } from "../../state/AuthContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createRecipe, updateRecipe } from "../../services/food/recipesApi";
+import { createRecipe, updateRecipe, deleteRecipe } from "../../services/food/recipesApi";
 import { fetchFoodPortions, type FoodItem, type PortionDto } from "../../services/food/foodLogsApi";
 import { consumePendingRecipeFood } from "../../state/recipeFoodPicker";
 import { useLanguage } from "../../state/LanguageContext";
@@ -40,13 +40,16 @@ interface DraftIngredient {
 }
 
 export default function CreateRecipeScreen({ route, navigation }: Props) {
-  const { meal, date, recipe: editRecipe } = route.params as MainStackParamList["CreateRecipe"] & {
+  const { meal, date, recipe: editRecipe, isCopy } = route.params as MainStackParamList["CreateRecipe"] & {
     recipe?: MainStackParamList["RecipeDetail"]["recipe"];
+    isCopy?: boolean;
   };
-  const isEditMode = Boolean(editRecipe?.id);
+  const isEditMode = Boolean(editRecipe?.id) && !isCopy;
   const { token, signOut } = useAuth();
   const { t } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -343,6 +346,20 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     }
   };
 
+  const onDelete = async () => {
+    if (!token || !editRecipe?.id || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteRecipe(token, editRecipe.id);
+      navigation.goBack();
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -351,6 +368,14 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
             <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
           <Text style={s.headerText}>{isEditMode ? t("recipes.editRecipe") : t("recipes.newRecipe")}</Text>
+          {isEditMode ? (
+            <Pressable
+              onPress={() => setShowDeleteConfirm(true)}
+              style={({ pressed }) => [s.deleteBtn, pressed && s.pressed]}
+            >
+              <Ionicons name="trash-outline" size={18} color="#dc2626" />
+            </Pressable>
+          ) : null}
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
@@ -562,11 +587,42 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
             {isSaving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={s.footerSaveBtnText}>{isEditMode ? t("recipes.updateRecipe") : t("recipes.saveRecipe")}</Text>
+              <Text style={s.footerSaveBtnText}>{isCopy ? t("recipes.saveRecipe") : isEditMode ? t("recipes.updateRecipe") : t("recipes.saveRecipe")}</Text>
             )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm ? (
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>{t("recipes.deleteConfirmTitle")}</Text>
+            <Text style={s.modalMessage}>
+              {t("recipes.deleteConfirmMessage").replace("{name}", name)}
+            </Text>
+            <View style={s.modalActions}>
+              <Pressable
+                onPress={() => setShowDeleteConfirm(false)}
+                style={({ pressed }) => [s.modalCancelBtn, pressed && s.pressed]}
+                disabled={isDeleting}
+              >
+                <Text style={s.modalCancelText}>{t("common.cancel")}</Text>
+              </Pressable>
+              <Pressable
+                onPress={onDelete}
+                style={({ pressed }) => [s.modalDeleteBtn, pressed && s.pressed]}
+                disabled={isDeleting}
+              >
+                {isDeleting
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.modalDeleteText}>{t("recipes.deleteRecipe")}</Text>
+                }
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -620,6 +676,55 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   headerText: { flex: 1, fontSize: 18, fontWeight: "700", color: "#111827" },
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fef2f2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Delete modal
+  modalOverlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  modalMessage: { fontSize: 14, color: "#4b5563", lineHeight: 20 },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+  },
+  modalCancelText: { fontSize: 15, fontWeight: "600", color: "#374151" },
+  modalDeleteBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#dc2626",
+    alignItems: "center",
+  },
+  modalDeleteText: { fontSize: 15, fontWeight: "700", color: "#fff" },
 
   scroll: { padding: 16, gap: 16, paddingBottom: 120 },
 
