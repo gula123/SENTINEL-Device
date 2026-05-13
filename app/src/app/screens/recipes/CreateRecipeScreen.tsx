@@ -76,10 +76,10 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
         foodId: ingredient.foodId,
         foodName: ingredient.foodName || `Food #${ingredient.foodId}`,
         rawGrams: String(ingredient.rawGrams),
-        caloriesPer100g: 0,
-        proteinPer100g: 0,
-        carbsPer100g: 0,
-        fatsPer100g: 0,
+        caloriesPer100g: ingredient.caloriesPer100g ?? 0,
+        proteinPer100g: ingredient.proteinPer100g ?? 0,
+        carbsPer100g: ingredient.carbsPer100g ?? 0,
+        fatsPer100g: ingredient.fatsPer100g ?? 0,
       }))
     );
   }, [editRecipe]);

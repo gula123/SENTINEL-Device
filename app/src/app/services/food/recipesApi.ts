@@ -6,6 +6,10 @@ export interface RecipeIngredientDto {
   foodId: number;
   foodName?: string;
   rawGrams: number;
+  caloriesPer100g?: number;
+  proteinPer100g?: number;
+  carbsPer100g?: number;
+  fatsPer100g?: number;
 }
 
 export interface RecipeDto {
