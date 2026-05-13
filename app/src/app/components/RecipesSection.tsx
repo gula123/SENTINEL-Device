@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { RecipeDto } from "../services/food/recipesApi";
+import { useLanguage } from "../state/LanguageContext";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -39,6 +40,7 @@ export function RecipesSection({
   const [usePortionByRecipeId, setUsePortionByRecipeId] = useState<Record<number, boolean>>({});
   const [portionAmountByRecipeId, setPortionAmountByRecipeId] = useState<Record<number, string>>({});
   const [loggingRecipeId, setLoggingRecipeId] = useState<number | null>(null);
+  const { t } = useLanguage();
 
   const data = recipes ?? [];
 
@@ -50,10 +52,10 @@ export function RecipesSection({
   const handleLog = async (recipe: RecipeDto, grams: number, mode: "grams" | "portion") => {
     if (isNaN(grams) || grams <= 0) {
       Alert.alert(
-        mode === "portion" ? "Enter portions" : "Enter grams",
+        mode === "portion" ? t("recipes.enterPortions") : t("recipes.enterGrams"),
         mode === "portion"
-          ? "Please enter how many portions you ate."
-          : "Please enter how many grams you ate."
+          ? t("recipes.enterPortionsMsg")
+          : t("recipes.enterGramsMsg")
       );
       return;
     }
@@ -71,13 +73,13 @@ export function RecipesSection({
   if (isLoading) {
     return (
       <View style={s.container}>
-        <Text style={s.title}>Recipes</Text>
+        <Text style={s.title}>{t("recipes.title")}</Text>
         <Pressable
           onPress={onCreateRecipe}
           style={({ pressed }) => [s.createBtn, pressed && s.createBtnPressed]}
         >
           <Ionicons name="add-circle-outline" size={16} color="#16a34a" />
-          <Text style={s.createBtnText}>Create Recipe</Text>
+          <Text style={s.createBtnText}>{t("recipes.createRecipe")}</Text>
         </Pressable>
         <View style={s.loadingContainer}>
           <ActivityIndicator size="small" color="#16a34a" />
@@ -89,15 +91,15 @@ export function RecipesSection({
   if (data.length === 0) {
     return (
       <View style={s.container}>
-        <Text style={s.title}>Recipes</Text>
+        <Text style={s.title}>{t("recipes.title")}</Text>
         <Pressable
           onPress={onCreateRecipe}
           style={({ pressed }) => [s.createBtn, pressed && s.createBtnPressed]}
         >
           <Ionicons name="add-circle-outline" size={16} color="#16a34a" />
-          <Text style={s.createBtnText}>Create Recipe</Text>
+          <Text style={s.createBtnText}>{t("recipes.createRecipe")}</Text>
         </Pressable>
-        <Text style={s.emptyText}>No recipes yet.</Text>
+        <Text style={s.emptyText}>{t("recipes.noRecipes")}</Text>
       </View>
     );
   }
@@ -109,7 +111,7 @@ export function RecipesSection({
         style={({ pressed }) => [s.createBtn, pressed && s.createBtnPressed]}
       >
         <Ionicons name="add-circle-outline" size={16} color="#16a34a" />
-        <Text style={s.createBtnText}>Create Recipe</Text>
+        <Text style={s.createBtnText}>{t("recipes.createRecipe")}</Text>
       </Pressable>
       <View style={s.results}>
         <FlatList
@@ -128,8 +130,8 @@ export function RecipesSection({
               ? portionAmount * (recipe.portionSizeGrams ?? 0)
               : gramsFromInput;
             const subtitle = recipe.portionSizeGrams
-              ? `1 portion = ${Math.round(recipe.portionSizeGrams)}g`
-              : "Grams mode";
+              ? t("recipes.onePortion").replace("{grams}", String(Math.round(recipe.portionSizeGrams)))
+              : t("recipes.gramsMode");
             const factor = grams / 100;
             const calories = Math.round(recipe.caloriesPer100g * factor);
             const protein = Math.round(recipe.proteinPer100g * factor * 10) / 10;
@@ -175,7 +177,7 @@ export function RecipesSection({
                         style={[s.portionChip, !usePortion && s.portionChipActive]}
                       >
                         <Text style={[s.portionChipText, !usePortion && s.portionChipTextActive]}>
-                          Grams
+                          {t("recipes.gramsMode")}
                         </Text>
                       </Pressable>
                       {hasPortion ? (
@@ -186,7 +188,7 @@ export function RecipesSection({
                           style={[s.portionChip, usePortion && s.portionChipActive]}
                         >
                           <Text style={[s.portionChipText, usePortion && s.portionChipTextActive]}>
-                            Portion
+                            {t("recipes.portionMode")}
                           </Text>
                         </Pressable>
                       ) : null}
@@ -203,7 +205,7 @@ export function RecipesSection({
                           }
                         }}
                         keyboardType="numeric"
-                        placeholder={usePortion ? "Amount" : "Grams"}
+                        placeholder={usePortion ? t("recipes.amountPlaceholder") : t("recipes.gramsPlaceholder")}
                         placeholderTextColor="#9ca3af"
                         style={s.input}
                       />
@@ -213,12 +215,12 @@ export function RecipesSection({
                         disabled={isLogging}
                         style={[s.addBtn, isLogging && s.addBtnDisabled]}
                       >
-                        <Text style={s.addBtnText}>{isLogging ? "Adding..." : "Add"}</Text>
+                        <Text style={s.addBtnText}>{isLogging ? t("recipes.adding") : t("recipes.add")}</Text>
                       </Pressable>
                     </View>
 
                     <View style={s.previewBox}>
-                      <Text style={s.previewTitle}>Preview ({Math.round(grams * 10) / 10}g)</Text>
+                      <Text style={s.previewTitle}>{t("recipes.preview").replace("{grams}", String(Math.round(grams * 10) / 10))}</Text>
                       <View style={s.previewRow}>
                         <Text style={s.previewItem}>🔥 {calories} kcal</Text>
                         <Text style={s.previewItem}>🥩 {protein}g P</Text>
@@ -229,8 +231,8 @@ export function RecipesSection({
 
                     <Text style={s.helper}>
                       {usePortion && hasPortion
-                        ? `1 portion = ${Math.round(recipe.portionSizeGrams ?? 0)}g`
-                        : "Direct grams mode"}
+                        ? t("recipes.onePortion").replace("{grams}", String(Math.round(recipe.portionSizeGrams ?? 0)))
+                        : t("recipes.directGramsMode")}
                     </Text>
                   </View>
                 ) : null}

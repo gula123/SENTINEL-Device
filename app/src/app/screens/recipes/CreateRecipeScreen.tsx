@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRecipe, updateRecipe } from "../../services/food/recipesApi";
 import { fetchFoodPortions, type FoodItem, type PortionDto } from "../../services/food/foodLogsApi";
 import { consumePendingRecipeFood } from "../../state/recipeFoodPicker";
+import { useLanguage } from "../../state/LanguageContext";
 
 type Props = NativeStackScreenProps<MainStackParamList, "CreateRecipe" | "RecipeDetail">;
 
@@ -44,6 +45,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
   };
   const isEditMode = Boolean(editRecipe?.id);
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
 
   const [name, setName] = useState("");
@@ -225,7 +227,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     if (editingIngredientUid === null) return;
     const grams = editingResolvedGrams;
     if (!Number.isFinite(grams) || grams <= 0) {
-      Alert.alert("Invalid grams", "Please enter valid grams.");
+      Alert.alert(t("recipes.invalidGrams"), t("recipes.enterValidGrams"));
       return;
     }
     setIngredients((prev) =>
@@ -286,24 +288,24 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     }
 
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a recipe name.");
+      Alert.alert(t("recipes.required"), t("recipes.enterName"));
       return;
     }
 
     if (ingredients.length === 0) {
-      Alert.alert("Required", "Add at least one ingredient from search.");
+      Alert.alert(t("recipes.required"), t("recipes.addIngredient"));
       return;
     }
 
     const cookedWeight = Number(finalCookedWeightG);
     if (!Number.isFinite(cookedWeight) || cookedWeight <= 0) {
-      Alert.alert("Required", "Please enter total cooked weight in grams (used for nutrition calculation).");
+      Alert.alert(t("recipes.required"), t("recipes.enterCookedWeight"));
       return;
     }
 
     const portionSize = portionSizeGrams.trim() ? Number(portionSizeGrams) : null;
     if (portionSize !== null && (!Number.isFinite(portionSize) || portionSize <= 0)) {
-      Alert.alert("Invalid", "Portion size must be a positive number or left empty.");
+      Alert.alert(t("recipes.invalid"), t("recipes.invalidPortionSize"));
       return;
     }
 
@@ -313,7 +315,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     }));
 
     if (normalizedIngredients.some((ingredient) => !Number.isFinite(ingredient.rawGrams) || ingredient.rawGrams <= 0)) {
-      Alert.alert("Invalid grams", "Every ingredient must have positive grams.");
+      Alert.alert(t("recipes.invalidGrams"), t("recipes.positiveGrams"));
       return;
     }
 
@@ -348,42 +350,42 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
-          <Text style={s.headerText}>{isEditMode ? "Edit Recipe" : "New Recipe"}</Text>
+          <Text style={s.headerText}>{isEditMode ? t("recipes.editRecipe") : t("recipes.newRecipe")}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           {/* Basic Info */}
           <View style={s.card}>
-            <Text style={s.cardTitle}>Recipe Info</Text>
+            <Text style={s.cardTitle}>{t("recipes.recipeInfo")}</Text>
             <LabeledInput
-              label="Name *"
+              label={t("recipes.nameLabel")}
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Chicken stir fry"
+              placeholder={t("recipes.namePlaceholder")}
             />
             <LabeledInput
-              label="Description"
+              label={t("recipes.descriptionLabel")}
               value={description}
               onChangeText={setDescription}
-              placeholder="Optional notes about this recipe"
+              placeholder={t("recipes.descriptionPlaceholder")}
               multiline
             />
             <LabeledInput
-              label="Total weight after cooking (g) *"
+              label={t("recipes.cookedWeightLabel")}
               value={finalCookedWeightG}
               onChangeText={setFinalCookedWeightG}
-              placeholder="e.g. 600 (final weight after cooking)"
+              placeholder={t("recipes.cookedWeightPlaceholder")}
               keyboardType="decimal-pad"
             />
             <LabeledInput
-              label="Define 1 portion as (grams of cooked meal)"
+              label={t("recipes.portionSizeLabel")}
               value={portionSizeGrams}
               onChangeText={setPortionSizeGrams}
-              placeholder="Optional - e.g. 200"
+              placeholder={t("recipes.portionSizePlaceholder")}
               keyboardType="decimal-pad"
             />
             <View style={s.toggleRow}>
-              <Text style={s.label}>Share publicly</Text>
+              <Text style={s.label}>{t("recipes.sharePublicly")}</Text>
               <Switch
                 value={isPublic}
                 onValueChange={setIsPublic}
@@ -400,16 +402,16 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
           >
             <Text style={s.actionBtnIcon}>🔍</Text>
             <View style={s.actionBtnContent}>
-              <Text style={[s.actionBtnTitle, s.searchBtnTitle]}>Search Ingredients</Text>
+              <Text style={[s.actionBtnTitle, s.searchBtnTitle]}>{t("recipes.searchIngredients")}</Text>
               <Text style={s.actionBtnSubtitle} numberOfLines={1}>
-                Open food search and add ingredients
+                {t("recipes.searchIngredientsSubtitle")}
               </Text>
             </View>
           </Pressable>
 
           {/* Ingredients */}
           <View style={s.card}>
-            <Text style={s.cardTitle}>Ingredients *</Text>
+            <Text style={s.cardTitle}>{t("recipes.ingredientsTitle")}</Text>
 
             {ingredients.length > 0 ? (
               <View style={s.results}>
@@ -454,7 +456,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
                                     onPress={onSelectEditGramMode}
                                     style={[s.portionChip, editingSelectedPortionId === null && s.portionChipActive]}
                                   >
-                                    <Text style={[s.portionChipText, editingSelectedPortionId === null && s.portionChipTextActive]}>Grams</Text>
+                                    <Text style={[s.portionChipText, editingSelectedPortionId === null && s.portionChipTextActive]}>{t("recipes.gramsMode")}</Text>
                                   </Pressable>
                                   {(portionsByFoodId[ingredient.foodId] || []).slice(0, 5).map((portion) => (
                                     <Pressable
@@ -478,7 +480,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
                                   value={editingPortionAmount}
                                   onChangeText={setEditingPortionAmount}
                                   keyboardType="decimal-pad"
-                                  placeholder="Amount"
+                                  placeholder={t("recipes.amountPlaceholder")}
                                   placeholderTextColor="#9ca3af"
                                 />
                               ) : (
@@ -487,19 +489,19 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
                                   value={editingGrams}
                                   onChangeText={setEditingGrams}
                                   keyboardType="decimal-pad"
-                                  placeholder="Grams"
+                                  placeholder={t("recipes.gramsPlaceholder")}
                                   placeholderTextColor="#9ca3af"
                                 />
                               )}
 
                               <Pressable onPress={onSaveEditedIngredient} style={({ pressed }) => [s.actionMini, pressed && s.pressed]}>
-                                <Text style={s.addBtnText}>Save</Text>
+                                <Text style={s.addBtnText}>{t("recipes.save")}</Text>
                               </Pressable>
                             </View>
 
                             {editingPreview ? (
                               <View style={s.previewBox}>
-                                <Text style={s.previewTitle}>Preview ({Math.round(editingPreview.grams * 10) / 10}g)</Text>
+                                <Text style={s.previewTitle}>{t("recipes.preview").replace("{grams}", String(Math.round(editingPreview.grams * 10) / 10))}</Text>
                                 <View style={s.previewRow}>
                                   <Text style={s.previewItem}>🔥 {editingPreview.calories} kcal</Text>
                                   <Text style={s.previewItem}>🥩 {editingPreview.protein}g P</Text>
@@ -512,7 +514,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
                             {editingSelectedPortion ? (
                               <Text style={s.helper}>1 {editingSelectedPortion.portionName} = {Math.round(editingSelectedPortion.grams * 10) / 10}g</Text>
                             ) : (
-                              <Text style={s.helper}>Direct grams mode</Text>
+                              <Text style={s.helper}>{t("recipes.directGramsMode")}</Text>
                             )}
                           </View>
                         ) : null}
@@ -521,23 +523,30 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
                   })}
               </View>
             ) : (
-              <Text style={s.emptyHint}>No ingredients added yet.</Text>
+              <Text style={s.emptyHint}>{t("recipes.noIngredients")}</Text>
             )}
           </View>
 
           {/* Nutrition Preview */}
           <View style={s.card}>
-            <Text style={s.cardTitle}>Nutrition Preview</Text>
-            <Text style={s.previewLine}>Total: {Math.round(nutritionPreview.totalCalories)} kcal</Text>
+            <Text style={s.cardTitle}>{t("recipes.nutritionPreview")}</Text>
+            <Text style={s.previewLine}>{t("recipes.nutritionTotal").replace("{cal}", String(Math.round(nutritionPreview.totalCalories)))}</Text>
             <Text style={s.previewLine}>
-              Protein {nutritionPreview.totalProtein.toFixed(1)}g · Carbs {nutritionPreview.totalCarbs.toFixed(1)}g · Fats {nutritionPreview.totalFats.toFixed(1)}g
+              {t("recipes.nutritionMacros")
+                .replace("{p}", nutritionPreview.totalProtein.toFixed(1))
+                .replace("{c}", nutritionPreview.totalCarbs.toFixed(1))
+                .replace("{f}", nutritionPreview.totalFats.toFixed(1))}
             </Text>
             {nutritionPreview.per100 ? (
               <Text style={s.previewLineStrong}>
-                Per 100g: {Math.round(nutritionPreview.per100.calories)} kcal · P {nutritionPreview.per100.protein.toFixed(1)}g · C {nutritionPreview.per100.carbs.toFixed(1)}g · F {nutritionPreview.per100.fats.toFixed(1)}g
+                {t("recipes.nutritionPer100")
+                  .replace("{cal}", String(Math.round(nutritionPreview.per100.calories)))
+                  .replace("{p}", nutritionPreview.per100.protein.toFixed(1))
+                  .replace("{c}", nutritionPreview.per100.carbs.toFixed(1))
+                  .replace("{f}", nutritionPreview.per100.fats.toFixed(1))}
               </Text>
             ) : (
-              <Text style={s.cardSubtitle}>Enter total cooked weight to see per-100g values.</Text>
+              <Text style={s.cardSubtitle}>{t("recipes.enterCookedWeightHint")}</Text>
             )}
           </View>
         </ScrollView>
@@ -553,7 +562,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
             {isSaving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={s.footerSaveBtnText}>{isEditMode ? "Update Recipe" : "Save Recipe"}</Text>
+              <Text style={s.footerSaveBtnText}>{isEditMode ? t("recipes.updateRecipe") : t("recipes.saveRecipe")}</Text>
             )}
           </Pressable>
         </View>

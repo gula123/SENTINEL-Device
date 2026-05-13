@@ -249,7 +249,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
                 style={[s.tabBtn, activeSection === "recipes" && s.tabBtnActive]}
               >
                 <Text style={[s.tabBtnText, activeSection === "recipes" && s.tabBtnTextActive]}>
-                  Recipes
+                  {t("recipes.title")}
                 </Text>
               </Pressable>
             </View>
