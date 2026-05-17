@@ -74,12 +74,13 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
     }, 2200);
   };
 
+  const _n = (v: string) => Number(v.replace(',', '.'));
   const customFoodPreview = {
-    grams: Number(customGrams),
-    calories: Math.round(Number(customCalories) * (Number(customGrams) / 100)),
-    protein: Math.round((Number(customProtein) * (Number(customGrams) / 100)) * 10) / 10,
-    carbs: Math.round((Number(customCarbs) * (Number(customGrams) / 100)) * 10) / 10,
-    fats: Math.round((Number(customFats) * (Number(customGrams) / 100)) * 10) / 10,
+    grams: _n(customGrams),
+    calories: Math.round(_n(customCalories) * (_n(customGrams) / 100)),
+    protein: Math.round((_n(customProtein) * (_n(customGrams) / 100)) * 10) / 10,
+    carbs: Math.round((_n(customCarbs) * (_n(customGrams) / 100)) * 10) / 10,
+    fats: Math.round((_n(customFats) * (_n(customGrams) / 100)) * 10) / 10,
   };
 
   const aiMutation = useMutation({
@@ -100,16 +101,16 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
     mutationFn: async () => {
       if (!token) throw new Error("AUTH_REQUIRED");
       if (!customName.trim()) throw new Error("Enter a food name");
-      const g = Number(customGrams);
+      const g = Number(customGrams.replace(',', '.'));
       if (!Number.isFinite(g) || g <= 0) throw new Error("Enter valid grams");
 
       const created = await createCustomFood(token, {
         name: customName.trim(),
         brandOrPlace: customBrandOrPlace.trim() || undefined,
-        caloriesPer100g: Number(customCalories) || 0,
-        proteinPer100g: Number(customProtein) || 0,
-        carbsPer100g: Number(customCarbs) || 0,
-        fatsPer100g: Number(customFats) || 0,
+        caloriesPer100g: Number(customCalories.replace(',', '.')) || 0,
+        proteinPer100g: Number(customProtein.replace(',', '.')) || 0,
+        carbsPer100g: Number(customCarbs.replace(',', '.')) || 0,
+        fatsPer100g: Number(customFats.replace(',', '.')) || 0,
       });
 
       await addMutation.mutateAsync({
