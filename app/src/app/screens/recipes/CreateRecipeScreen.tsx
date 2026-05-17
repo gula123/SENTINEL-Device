@@ -155,13 +155,13 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     };
   }, [ingredients, finalCookedWeightG, editRecipe]);
 
-  const onAddFood = (food: FoodItem) => {
+  const onAddFood = (food: FoodItem, defaultGrams: number = 100) => {
     setIngredients((prev) => {
       const existing = prev.find((item) => item.foodId === food.id);
       if (existing) {
         return prev.map((item) =>
           item.foodId === food.id
-            ? { ...item, rawGrams: String((Number(item.rawGrams) || 0) + 100) }
+            ? { ...item, rawGrams: String((Number(item.rawGrams) || 0) + defaultGrams) }
             : item
         );
       }
@@ -172,7 +172,7 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
           uid: newUid(),
           foodId: food.id,
           foodName: food.name,
-          rawGrams: "100",
+          rawGrams: String(defaultGrams),
           caloriesPer100g: food.calories,
           proteinPer100g: food.protein,
           carbsPer100g: food.carbs,
@@ -184,9 +184,9 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      const selected = consumePendingRecipeFood();
-      if (selected) {
-        onAddFood(selected);
+      const pending = consumePendingRecipeFood();
+      if (pending) {
+        onAddFood(pending.food, pending.grams);
       }
     }, [])
   );

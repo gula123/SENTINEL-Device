@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { searchFoods, type FoodItem } from "../../services/food/foodLogsApi";
+import {
+  fetchFoodPortions,
+  fetchPortionTypes,
+  searchFoods,
+  type FoodItem,
+  type PortionDto,
+  type PortionTypeDto,
+} from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { setPendingRecipeFood } from "../../state/recipeFoodPicker";
@@ -27,17 +34,25 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
   const { t } = useLanguage();
 
   const [query, setQuery] = useState("");
+  const [grams, setGrams] = useState("100");
+  const [portionAmount, setPortionAmount] = useState("1");
+  const [selectedPortionId, setSelectedPortionId] = useState<number | null>(null);
   const [results, setResults] = useState<FoodItem[]>([]);
+  const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [portions, setPortions] = useState<PortionDto[]>([]);
+  const [portionTypes, setPortionTypes] = useState<PortionTypeDto[]>([]);
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 350);
-
+    const timer = setTimeout(() => setDebouncedQuery(query), 350);
     return () => clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchPortionTypes(token).then(setPortionTypes).catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (!token || debouncedQuery.trim().length < 2) {
@@ -45,39 +60,111 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
       setSearching(false);
       return;
     }
-
+    if (selectedFood && debouncedQuery.trim().toLowerCase() === selectedFood.name.trim().toLowerCase()) {
+      setSearching(false);
+      return;
+    }
     let cancelled = false;
-
     const runSearch = async () => {
       try {
         setSearching(true);
         const foods = await searchFoods(token, debouncedQuery);
-        if (!cancelled) {
-          setResults(foods.slice(0, 12));
-        }
+        if (!cancelled) setResults(foods.slice(0, 12));
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Search failed";
-        if (msg === "AUTH_EXPIRED") {
-          signOut();
-          return;
-        }
+        if (msg === "AUTH_EXPIRED") { signOut(); return; }
         Alert.alert("Error", msg);
       } finally {
         if (!cancelled) setSearching(false);
       }
     };
-
     runSearch();
+    return () => { cancelled = true; };
+  }, [debouncedQuery, token, signOut, selectedFood]);
 
-    return () => {
-      cancelled = true;
+  const selectedPortion = useMemo(
+    () => portions.find((p) => p.id === selectedPortionId) || null,
+    [portions, selectedPortionId]
+  );
+
+  const resolvedGrams = useMemo(() => {
+    if (selectedPortion) {
+      const a = Number(portionAmount);
+      return Number.isFinite(a) && a > 0 ? Math.round(selectedPortion.grams * a * 10) / 10 : 0;
+    }
+    const g = Number(grams);
+    return Number.isFinite(g) && g > 0 ? g : 0;
+  }, [selectedPortion, portionAmount, grams]);
+
+  const preview = useMemo(() => {
+    if (!selectedFood) return null;
+    const factor = resolvedGrams / 100;
+    return {
+      grams: resolvedGrams,
+      calories: Math.round(selectedFood.calories * factor),
+      protein: Math.round(selectedFood.protein * factor * 10) / 10,
+      carbs: Math.round(selectedFood.carbs * factor * 10) / 10,
+      fats: Math.round(selectedFood.fats * factor * 10) / 10,
     };
-  }, [debouncedQuery, token, signOut]);
+  }, [selectedFood, resolvedGrams]);
 
-  const onSelectFood = (food: FoodItem) => {
-    setPendingRecipeFood(food);
+  function handleError(err: unknown) {
+    const msg = err instanceof Error ? err.message : "Something went wrong";
+    if (msg === "AUTH_EXPIRED") { signOut(); return; }
+    Alert.alert("Error", msg);
+  }
+
+  const loadPortions = async (foodId: number) => {
+    if (!token) return;
+    try {
+      const data = await fetchFoodPortions(token, foodId);
+      setPortions(data);
+    } catch (err) {
+      handleError(err);
+    }
+  };
+
+  const onSelectFood = async (food: FoodItem) => {
+    setSelectedFood(food);
+    setQuery(food.name);
+    setResults([]);
+    setSelectedPortionId(null);
+    setPortionAmount("1");
+    setGrams("100");
+    await loadPortions(food.id);
+  };
+
+  const onAdd = () => {
+    if (!selectedFood) return;
+    if (!Number.isFinite(resolvedGrams) || resolvedGrams <= 0) {
+      Alert.alert(t("searchFood.invalidGrams"), t("searchFood.positiveNumber"));
+      return;
+    }
+    setPendingRecipeFood(selectedFood, resolvedGrams);
     navigation.goBack();
+  };
+
+  const onClear = () => {
+    setSelectedFood(null);
+    setQuery("");
+    setResults([]);
+    setPortions([]);
+    setSelectedPortionId(null);
+    setPortionAmount("1");
+    setGrams("100");
+  };
+
+  const onSearch = (text: string) => {
+    setQuery(text);
+    setSelectedFood(null);
+    setSelectedPortionId(null);
+    setPortionAmount("1");
+    setPortions([]);
+    if (text.trim().length < 2) {
+      setResults([]);
+      setSearching(false);
+    }
   };
 
   return (
@@ -92,41 +179,119 @@ export default function SearchRecipeFoodScreen({ navigation }: Props) {
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
-            <View style={s.searchRow}>
-              <Ionicons name="search-outline" size={16} color="#9ca3af" style={s.searchIcon} />
-              <TextInput
-                style={s.searchInput}
-                placeholder={t("searchFood.placeholder")}
-                placeholderTextColor="#9ca3af"
-                value={query}
-                onChangeText={setQuery}
-                returnKeyType="search"
-              />
-              {searching ? <ActivityIndicator size="small" color="#16a34a" /> : null}
-            </View>
+            <Text style={s.cardTitle}>{t("searchFood.cardTitle")}</Text>
 
-            {debouncedQuery.trim().length >= 2 && results.length === 0 && !searching ? (
-              <Text style={s.emptyText}>{t("searchFood.noResults")}</Text>
+            {selectedFood ? (
+              <View style={s.selectedChip}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.selectedChipText} numberOfLines={1}>✓ {selectedFood.name}</Text>
+                  {selectedFood.brandOrPlace ? (
+                    <Text style={s.selectedChipSubText} numberOfLines={1}>{selectedFood.brandOrPlace}</Text>
+                  ) : null}
+                </View>
+                <Pressable onPress={onClear} style={({ pressed }) => [s.clearBtn, pressed && s.pressed]}>
+                  <Text style={s.clearBtnText}>✕</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  value={query}
+                  onChangeText={onSearch}
+                  placeholder={t("searchFood.placeholder")}
+                  placeholderTextColor="#9ca3af"
+                  style={s.input}
+                  autoFocus
+                  returnKeyType="search"
+                />
+                {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
+                {results.length > 0 ? (
+                  <View style={s.results}>
+                    {results.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => onSelectFood(item)}
+                        style={({ pressed }) => [s.resultRow, pressed && s.pressed]}
+                      >
+                        <View style={s.resultTextCol}>
+                          <Text style={s.resultName}>{item.name}</Text>
+                          {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
+                        </View>
+                        <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            )}
+
+            {selectedFood && portions.length > 0 ? (
+              <View style={s.portionWrap}>
+                <Text style={s.portionLabel}>{t("searchFood.portions")}</Text>
+                <View style={s.portionRow}>
+                  <Pressable
+                    onPress={() => { setSelectedPortionId(null); setPortionAmount("1"); }}
+                    style={({ pressed }) => [s.portionChip, selectedPortionId === null && s.portionChipActive, pressed && s.pressed]}
+                  >
+                    <Text style={[s.portionChipText, selectedPortionId === null && s.portionChipTextActive]}>{t("searchFood.gramChip")}</Text>
+                  </Pressable>
+                  {portions.map((portion) => (
+                    <Pressable
+                      key={portion.id}
+                      onPress={() => { setSelectedPortionId(portion.id); setPortionAmount("1"); setGrams(String(Math.round(portion.grams * 10) / 10)); }}
+                      style={({ pressed }) => [s.portionChip, selectedPortionId === portion.id && s.portionChipActive, pressed && s.pressed]}
+                    >
+                      <Text style={[s.portionChipText, selectedPortionId === portion.id && s.portionChipTextActive]}>
+                        {portion.portionName} ({Math.round(portion.grams)}g)
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             ) : null}
 
-            {results.length > 0 ? (
-              <View style={s.searchResults}>
-                {results.map((food) => (
-                  <Pressable
-                    key={food.id}
-                    onPress={() => onSelectFood(food)}
-                    style={({ pressed }) => [s.searchResultRow, pressed && s.pressed]}
-                  >
-                    <View style={s.searchResultLeft}>
-                      <Text style={s.searchResultName} numberOfLines={1}>{food.name}</Text>
-                      {food.brandOrPlace ? (
-                        <Text style={s.searchResultBrand} numberOfLines={1}>{food.brandOrPlace}</Text>
-                      ) : null}
-                    </View>
-                    <Text style={s.searchResultCal}>{Math.round(food.calories)} kcal/100g</Text>
-                    <Ionicons name="add-circle" size={20} color="#16a34a" />
-                  </Pressable>
-                ))}
+            {preview ? (
+              <View style={s.previewBox}>
+                <Text style={s.previewTitle}>
+                  {selectedPortion
+                    ? `Will add (${portionAmount || "0"} x ${selectedPortion.portionName} = ${preview.grams}g)`
+                    : `Will add (${preview.grams}g)`}
+                </Text>
+                <View style={s.previewRow}>
+                  <Text style={s.previewItem}>🔥 {preview.calories} kcal</Text>
+                  <Text style={s.previewItem}>🥩 {preview.protein}g P</Text>
+                  <Text style={s.previewItem}>🍚 {preview.carbs}g C</Text>
+                  <Text style={s.previewItem}>🥑 {preview.fats}g F</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {selectedFood ? (
+              <View style={s.row}>
+                {selectedPortion ? (
+                  <TextInput
+                    value={portionAmount}
+                    onChangeText={setPortionAmount}
+                    keyboardType="numeric"
+                    placeholder="Amount"
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.gramsInput]}
+                    returnKeyType="done"
+                  />
+                ) : (
+                  <TextInput
+                    value={grams}
+                    onChangeText={setGrams}
+                    keyboardType="numeric"
+                    placeholder={t("searchFood.grams")}
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.gramsInput]}
+                    returnKeyType="done"
+                  />
+                )}
+                <Pressable onPress={onAdd} style={({ pressed }) => [s.addBtn, pressed && s.pressed]}>
+                  <Text style={s.addBtnText}>{t("searchFood.add")}</Text>
+                </Pressable>
               </View>
             ) : null}
           </View>
@@ -142,22 +307,22 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 14,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
-    gap: 8,
+    gap: 10,
   },
   backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
   },
-  headerText: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  scroll: { padding: 16, gap: 10, paddingBottom: 32 },
+  headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  scroll: { padding: 16, gap: 12, paddingBottom: 40 },
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -166,43 +331,102 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  cardTitle: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 },
+  input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#e5e7eb",
     borderRadius: 10,
-    paddingHorizontal: 10,
-    backgroundColor: "#f9fafb",
-    gap: 6,
-  },
-  searchIcon: { marginRight: 2 },
-  searchInput: {
-    flex: 1,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
     color: "#111827",
+    backgroundColor: "#f9fafb",
   },
-  emptyText: { fontSize: 12, color: "#9ca3af", textAlign: "center", paddingVertical: 8 },
-  searchResults: {
+  results: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
     borderRadius: 10,
     overflow: "hidden",
   },
-  searchResultRow: {
+  resultRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 8,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
     backgroundColor: "#fff",
   },
-  searchResultLeft: { flex: 1 },
-  searchResultName: { fontSize: 13, color: "#111827", fontWeight: "600" },
-  searchResultBrand: { fontSize: 11, color: "#6b7280", marginTop: 1 },
-  searchResultCal: { fontSize: 11, color: "#9ca3af" },
+  resultTextCol: { flex: 1, marginRight: 8 },
+  resultName: { fontSize: 13, color: "#111827" },
+  resultSubmeta: { fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: "500" },
+  resultMeta: { fontSize: 12, color: "#9ca3af" },
+  selectedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#dcfce7",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    gap: 8,
+  },
+  selectedChipText: { flex: 1, fontSize: 13, color: "#166534", fontWeight: "600" },
+  selectedChipSubText: { fontSize: 11, color: "#6b7280", fontWeight: "500", marginTop: 2 },
+  clearBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearBtnText: { fontSize: 13, color: "#166534", fontWeight: "700", lineHeight: 16 },
+  portionWrap: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+    backgroundColor: "#f9fafb",
+  },
+  portionLabel: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+  portionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  portionChip: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  portionChipActive: { borderColor: "#16a34a", backgroundColor: "#dcfce7" },
+  portionChipText: { fontSize: 11, color: "#374151", fontWeight: "600" },
+  portionChipTextActive: { fontSize: 11, color: "#166534", fontWeight: "600" },
+  previewBox: {
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  previewTitle: { fontSize: 12, color: "#166534", fontWeight: "700" },
+  previewRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  previewItem: { fontSize: 12, color: "#374151", fontWeight: "600" },
+  row: { flexDirection: "row", gap: 10, alignItems: "center" },
+  gramsInput: { flex: 1 },
+  addBtn: {
+    backgroundColor: "#16a34a",
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 80,
+  },
+  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   pressed: { opacity: 0.65 },
 });

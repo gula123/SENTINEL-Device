@@ -100,14 +100,14 @@ export default function MealDetailScreen({ route, navigation }: Props) {
     });
   }, [items, token, portionsByFoodId, loadingPortionsFoodIds]);
 
-  const handleAddFood = useCallback((food: FoodItem) => {
+  const handleAddFood = useCallback((food: FoodItem, defaultGrams: number = 100) => {
     setItems((prev) => [
       ...prev,
       {
         foodId: food.id,
         foodName: food.name,
         brandOrPlace: food.brandOrPlace,
-        grams: "100",
+        grams: String(defaultGrams),
         caloriesPer100g: food.calories,
         proteinPer100g: food.protein,
         carbsPer100g: food.carbs,
@@ -118,9 +118,9 @@ export default function MealDetailScreen({ route, navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      const selected = consumePendingMealFood();
-      if (selected) {
-        handleAddFood(selected);
+      const pending = consumePendingMealFood();
+      if (pending) {
+        handleAddFood(pending.food, pending.grams);
       }
     }, [handleAddFood])
   );

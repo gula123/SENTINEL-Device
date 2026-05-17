@@ -1,13 +1,18 @@
 import type { FoodItem } from "../services/food/foodLogsApi";
 
-let pendingRecipeFood: FoodItem | null = null;
-
-export function setPendingRecipeFood(food: FoodItem) {
-  pendingRecipeFood = food;
+interface PendingRecipeFood {
+  food: FoodItem;
+  grams: number;
 }
 
-export function consumePendingRecipeFood() {
-  const food = pendingRecipeFood;
+let pendingRecipeFood: PendingRecipeFood | null = null;
+
+export function setPendingRecipeFood(food: FoodItem, grams: number) {
+  pendingRecipeFood = { food, grams };
+}
+
+export function consumePendingRecipeFood(): PendingRecipeFood | null {
+  const data = pendingRecipeFood;
   pendingRecipeFood = null;
-  return food;
+  return data;
 }
