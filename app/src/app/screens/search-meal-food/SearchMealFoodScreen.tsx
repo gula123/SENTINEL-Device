@@ -28,7 +28,7 @@ import { setPendingMealFood } from "../../state/mealFoodPicker";
 
 type Props = NativeStackScreenProps<MainStackParamList, "SearchMealFood">;
 
-export default function SearchMealFoodScreen({ navigation }: Props) {
+export default function SearchMealFoodScreen({ navigation, route }: Props) {
   const { token, signOut } = useAuth();
 
   const [query, setQuery] = useState("");
@@ -218,6 +218,18 @@ export default function SearchMealFoodScreen({ navigation }: Props) {
                         <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
                       </Pressable>
                     ))}
+                  </View>
+                ) : null}
+                {query.trim().length > 0 && !searching ? (
+                  <View style={s.createFoodSection}>
+                    <Text style={s.createFoodLabel}>Can't find what you're looking for?</Text>
+                    <Pressable
+                      onPress={() => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "meal" })}
+                      style={({ pressed }) => [s.createFoodBtn, pressed && s.pressed]}
+                    >
+                      <Ionicons name="add-circle-outline" size={14} color="#16a34a" />
+                      <Text style={s.createFoodBtnText}>Create new food</Text>
+                    </Pressable>
                   </View>
                 ) : null}
               </>
@@ -421,5 +433,9 @@ const s = StyleSheet.create({
     minWidth: 80,
   },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  createFoodSection: { borderTopWidth: 1, borderTopColor: "#e5e7eb", paddingTop: 12, marginTop: 4, gap: 8 },
+  createFoodLabel: { fontSize: 13, color: "#374151", fontWeight: "600" },
+  createFoodBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, alignSelf: "flex-start" },
+  createFoodBtnText: { fontSize: 13, color: "#16a34a", fontWeight: "600" },
   pressed: { opacity: 0.65 },
 });

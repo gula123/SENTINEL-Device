@@ -538,6 +538,18 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                     ))}
                   </View>
                 ) : null}
+                {query.trim().length > 0 && !searching ? (
+                  <View style={s.createFoodSection}>
+                    <Text style={s.createFoodLabel}>Can't find what you're looking for?</Text>
+                    <Pressable
+                      onPress={() => navigation.navigate("CreateFood", { meal, date })}
+                      style={({ pressed }) => [s.createFoodBtn, pressed && s.pressed]}
+                    >
+                      <Ionicons name="add-circle-outline" size={14} color="#16a34a" />
+                      <Text style={s.createFoodBtnText}>Create new food</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </>
               )}
 
@@ -976,6 +988,10 @@ const s = StyleSheet.create({
   },
   addBtnDisabled: { backgroundColor: "#d1d5db" },
   addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  createFoodSection: { borderTopWidth: 1, borderTopColor: "#e5e7eb", paddingTop: 12, marginTop: 4, gap: 8 },
+  createFoodLabel: { fontSize: 13, color: "#374151", fontWeight: "600" },
+  createFoodBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, alignSelf: "flex-start" },
+  createFoodBtnText: { fontSize: 13, color: "#16a34a", fontWeight: "600" },
 
   modifyRecipeBtn: {
     flexDirection: "row",

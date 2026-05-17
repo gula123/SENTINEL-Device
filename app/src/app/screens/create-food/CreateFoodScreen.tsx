@@ -25,6 +25,8 @@ import {
 } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
+import { setPendingMealFood } from "../../state/mealFoodPicker";
+import { setPendingRecipeFood } from "../../state/recipeFoodPicker";
 
 const MEAL_LABEL: Record<MealType, string> = {
   BREAKFAST: "Breakfast",
@@ -42,7 +44,7 @@ const MEAL_ICON: Record<MealType, string> = {
 type Props = NativeStackScreenProps<MainStackParamList, "CreateFood">;
 
 export default function CreateFoodScreen({ route, navigation }: Props) {
-  const { meal, date } = route.params;
+  const { meal, date, returnTo } = route.params;
 
   const [customName, setCustomName] = useState("");
   const [customBrandOrPlace, setCustomBrandOrPlace] = useState("");
@@ -113,14 +115,18 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
         fatsPer100g: Number(customFats.replace(',', '.')) || 0,
       });
 
-      await addMutation.mutateAsync({
-        foodName: created.name,
-        foodId: created.id,
-        grams: g,
-        mealType: meal,
-      });
+      if (!returnTo || returnTo === "foodLog") {
+        await addMutation.mutateAsync({
+          foodName: created.name,
+          foodId: created.id,
+          grams: g,
+          mealType: meal,
+        });
+      }
+
+      return { created, g };
     },
-    onSuccess: () => {
+    onSuccess: ({ created, g }) => {
       setCustomName("");
       setCustomCalories("0");
       setCustomProtein("0");
@@ -129,10 +135,18 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
       setCustomGrams("100");
       setCustomBrandOrPlace("");
       setAiNote("");
-      queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
-      queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
-      queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
-      navigation.goBack();
+      if (returnTo === "meal") {
+        setPendingMealFood(created, g);
+        navigation.pop(2);
+      } else if (returnTo === "recipe") {
+        setPendingRecipeFood(created, g);
+        navigation.pop(2);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
+        queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
+        queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
+        navigation.goBack();
+      }
     },
     onError: (err) => {
       handleError(err);
@@ -237,7 +251,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
-            <Text style={s.inputLabel}>{t("createFood.eatenGrams")}</Text>
+            <Text style={s.inputLabel}>{returnTo === "meal" || returnTo === "recipe" ? "Grams" : t("createFood.eatenGrams")}</Text>
             <TextInput
               value={customGrams}
               onChangeText={setCustomGrams}
@@ -249,7 +263,11 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
 
             {customFoodPreview ? (
               <View style={s.previewBox}>
-                <Text style={s.previewTitle}>{t("createFood.willBeLogged").replace("{grams}", String(customFoodPreview.grams))}</Text>
+                <Text style={s.previewTitle}>
+                  {returnTo === "meal" || returnTo === "recipe"
+                    ? `Will add ${customFoodPreview.grams}g as ingredient`
+                    : t("createFood.willBeLogged").replace("{grams}", String(customFoodPreview.grams))}
+                </Text>
                 <View style={s.previewRow}>
                   <Text style={s.previewItem}>🔥 {customFoodPreview.calories} kcal</Text>
                   <Text style={s.previewItem}>🥩 {customFoodPreview.protein}g P</Text>
@@ -264,7 +282,13 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               disabled={createCustomMutation.isPending}
               style={({ pressed }) => [s.addBtn, pressed && s.pressed]}
             >
-              <Text style={s.addBtnText}>{createCustomMutation.isPending ? t("createFood.saving") : t("createFood.createAndLog")}</Text>
+              <Text style={s.addBtnText}>
+                {createCustomMutation.isPending
+                  ? t("createFood.saving")
+                  : returnTo === "meal" || returnTo === "recipe"
+                  ? "Create & add as ingredient"
+                  : t("createFood.createAndLog")}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>

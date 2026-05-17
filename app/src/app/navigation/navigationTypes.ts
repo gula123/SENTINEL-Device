@@ -8,7 +8,7 @@ export type MainStackParamList = {
   SearchFood: { meal: MealType; date: string };
   SearchMealFood: { meal: MealType; date: string; editMealId?: number };
   SearchRecipeFood: { meal: MealType; date: string };
-  CreateFood: { meal: MealType; date: string };
+  CreateFood: { meal: MealType; date: string; returnTo?: "foodLog" | "meal" | "recipe" };
   MealDetail: { meal: MealType; date: string; editMealId?: number };
   HabitInsights: { habitId: number; habitName: string };
   CreateRecipe: { meal: MealType; date: string; recipe?: RecipeDto; isCopy?: boolean };
