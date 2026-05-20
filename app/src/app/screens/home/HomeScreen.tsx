@@ -176,6 +176,7 @@ function DayView({
   signOut,
   language,
   t,
+  onStreakChange,
 }: {
   date: string;
   width: number;
@@ -186,11 +187,18 @@ function DayView({
   signOut: () => Promise<void>;
   language: any;
   t: (key: string) => string;
+  onStreakChange?: (streak: number) => void;
 }) {
   const queryClient = useQueryClient();
   const [showFillOptions, setShowFillOptions] = useState(false);
   const diaryDayQuery = useDiaryDay(date, { enabled: shouldFetch });
   const calendarMonthQuery = useCalendarData(dayjs(date).format("YYYY-MM"));
+
+  useEffect(() => {
+    if (onStreakChange && calendarMonthQuery.data?.streak !== undefined) {
+      onStreakChange(calendarMonthQuery.data.streak);
+    }
+  }, [calendarMonthQuery.data?.streak]);
   const vacation = useVacationDay(date, { enabled: false });
   const settingsQuery = useUserSettings();
   const summary = diaryDayQuery.data?.summary;
@@ -283,11 +291,6 @@ function DayView({
             {isVacationDay ? t("home.vacationChip") : t("home.offDayChip")}
           </Text>
         </Pressable>
-
-        <View style={styles.streakChip}>
-          <Text style={styles.streakChipIcon}>🔥</Text>
-          <Text style={styles.streakChipText}>{calendarMonthQuery.data?.streak ?? 0}</Text>
-        </View>
 
         {!isVacationDay ? (
           <Pressable
@@ -441,6 +444,7 @@ export default function HomeScreen() {
   const [initialIndex, setInitialIndex] = useState(todayIndex);
   const [listSeed, setListSeed] = useState(0);
   const [listHeight, setListHeight] = useState(0);
+  const [todayStreak, setTodayStreak] = useState(0);
   const [focusTarget, setFocusTarget] = useState<{ date: string; token: number } | null>(null);
   const listRef = useRef<FlatList<string>>(null);
   const activeDate = allDates[activeIndex] ?? todayStr;
@@ -501,7 +505,12 @@ export default function HomeScreen() {
             <Pressable onPress={goToToday} style={({ pressed }) => [styles.todayPill, pressed && styles.buttonPressed]}>
               <Text style={styles.todayPillText}>{t("home.goToToday")}</Text>
             </Pressable>
-          ) : null}
+          ) : (
+            <View style={styles.streakChip}>
+              <Text style={styles.streakChipIcon}>🔥</Text>
+              <Text style={styles.streakChipText}>{todayStreak}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.dateLabelWrap}>
           <Text style={styles.dateLabelMain}>{isToday ? t("home.today") : dayjs(activeDate).format("dddd")}</Text>
@@ -525,6 +534,7 @@ export default function HomeScreen() {
             signOut={signOut}
             language={language}
             t={t}
+            onStreakChange={date === todayStr ? setTodayStreak : undefined}
           />
         )}
         horizontal
