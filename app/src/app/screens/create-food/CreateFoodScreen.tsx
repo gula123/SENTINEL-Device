@@ -145,7 +145,8 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
         queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
         queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
         queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
-        navigation.goBack();
+        showToast(`${created.name} added to ${MEAL_LABEL[meal]}`);
+        setTimeout(() => navigation.goBack(), 1500);
       }
     },
     onError: (err) => {

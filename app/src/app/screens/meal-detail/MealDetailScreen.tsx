@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -116,11 +117,28 @@ export default function MealDetailScreen({ route, navigation }: Props) {
     ]);
   }, []);
 
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
+    toastAnim.setValue(0);
+    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start(() =>
+        setToastMessage(null)
+      );
+    }, 2200);
+  }
+
   useFocusEffect(
     useCallback(() => {
       const pending = consumePendingMealFood();
       if (pending) {
         handleAddFood(pending.food, pending.grams);
+        showToast(`${pending.food.name} added to meal`);
       }
     }, [handleAddFood])
   );
@@ -499,14 +517,45 @@ export default function MealDetailScreen({ route, navigation }: Props) {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {toastMessage ? (
+        <Animated.View
+          style={[
+            s.toast,
+            {
+              opacity: toastAnim,
+              transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={s.toastText}>✓  {toastMessage}</Text>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f8fdfb" },
-  header: {
-    flexDirection: "row",
+  toast: {
+    position: "absolute",
+    bottom: 86,
+    left: 24,
+    right: 24,
+    backgroundColor: "#166534",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  header: {    flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 10,

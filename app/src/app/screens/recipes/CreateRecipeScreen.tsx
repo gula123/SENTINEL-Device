@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +18,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAuth } from "../../state/AuthContext";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRecipe, updateRecipe, deleteRecipe } from "../../services/food/recipesApi";
 import { fetchFoodPortions, type FoodItem, type PortionDto } from "../../services/food/foodLogsApi";
 import { consumePendingRecipeFood } from "../../state/recipeFoodPicker";
@@ -182,11 +183,28 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
     });
   };
 
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
+    toastAnim.setValue(0);
+    Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 350, useNativeDriver: true }).start(() =>
+        setToastMessage(null)
+      );
+    }, 2200);
+  }
+
   useFocusEffect(
     useCallback(() => {
       const pending = consumePendingRecipeFood();
       if (pending) {
         onAddFood(pending.food, pending.grams);
+        showToast(`${pending.food.name} added as ingredient`);
       }
     }, [])
   );
@@ -623,6 +641,21 @@ export default function CreateRecipeScreen({ route, navigation }: Props) {
           </View>
         </View>
       ) : null}
+
+      {toastMessage ? (
+        <Animated.View
+          style={[
+            s.toast,
+            {
+              opacity: toastAnim,
+              transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={s.toastText}>✓  {toastMessage}</Text>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -656,6 +689,23 @@ function LabeledInput({ label, value, onChangeText, placeholder, keyboardType = 
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f8fdfb" },
+  toast: {
+    position: "absolute",
+    bottom: 86,
+    left: 24,
+    right: 24,
+    backgroundColor: "#166534",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 
   header: {
     flexDirection: "row",
