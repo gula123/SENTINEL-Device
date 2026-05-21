@@ -25,6 +25,7 @@ import {
   fetchFoodPortions,
   fetchPortionTypes,
   removeFavoriteFood,
+  searchFoodByBarcode,
   type PortionDto,
   type PortionTypeDto,
   searchFoods,
@@ -34,6 +35,7 @@ import {
 import { searchRecipes, logRecipe, type RecipeDto } from "../../services/food/recipesApi";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
+import BarcodeScannerModal from "../../components/BarcodeScannerModal";
 
 const MEAL_LABEL: Record<MealType, string> = {
   BREAKFAST: "BREAKFAST",
@@ -69,6 +71,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
   const [newPortionGrams, setNewPortionGrams] = useState("100");
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [barcodeScanning, setBarcodeScanning] = useState(false);
 
   const { token, signOut } = useAuth();
   const { t } = useLanguage();
@@ -133,6 +136,29 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       return;
     }
     Alert.alert("Error", msg);
+  }
+
+  async function handleBarcodeScanned(code: string) {
+    setBarcodeScanning(false);
+    if (!token) return;
+    try {
+      const result = await searchFoodByBarcode(token, code);
+      if (result) {
+        setResults([result]);
+        setQuery(result.name);
+      } else {
+        Alert.alert(
+          "Not found",
+          "This product is not in our database yet.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Create this food", onPress: () => navigation.navigate("CreateFood", { meal, date, barcode: code }) },
+          ]
+        );
+      }
+    } catch (err) {
+      handleError(err);
+    }
   }
 
   function invalidate() {
@@ -312,18 +338,6 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     setPortionAmount("1");
   };
 
-  const onAiEstimate = async () => {
-    if (!customName.trim()) {
-      Alert.alert("Enter a food name first.");
-      return;
-    }
-    try {
-      await aiMutation.mutateAsync(customName.trim());
-    } catch (err) {
-      handleError(err);
-    }
-  };
-
   const availablePortionTypes = useMemo(() => {
     return portionTypes.filter((type) =>
       !portions.some((portion) => (portion.portionTypeCode || "").toLowerCase() === type.code.toLowerCase())
@@ -473,15 +487,24 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
               </View>
               ) : (
               <>
-                <TextInput
-                  value={query}
-                  onChangeText={onSearch}
-                  placeholder={t("searchFood.placeholder")}
-                  placeholderTextColor="#9ca3af"
-                  style={s.input}
-                  autoFocus
-                  returnKeyType="search"
-                />
+                <View style={s.searchRow}>
+                  <TextInput
+                    value={query}
+                    onChangeText={onSearch}
+                    placeholder={t("searchFood.placeholder")}
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.inputFlex]}
+                    autoFocus
+                    returnKeyType="search"
+                  />
+                  <Pressable
+                    onPress={() => setBarcodeScanning(true)}
+                    style={({ pressed }) => [s.scanIconBtn, pressed && s.pressed]}
+                    accessibilityLabel="Scan barcode"
+                  >
+                    <Ionicons name="barcode-outline" size={22} color="#16a34a" />
+                  </Pressable>
+                </View>
 
                 {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
 
@@ -800,6 +823,12 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
           </Animated.View>
         ) : null}
       </KeyboardAvoidingView>
+
+      <BarcodeScannerModal
+        visible={barcodeScanning}
+        onScanned={handleBarcodeScanned}
+        onClose={() => setBarcodeScanning(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1025,6 +1054,27 @@ const s = StyleSheet.create({
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   pressed: { opacity: 0.65 },
+
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  inputFlex: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  scanIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   toast: {
     position: "absolute",

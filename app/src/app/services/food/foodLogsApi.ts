@@ -25,6 +25,7 @@ export interface FoodItem {
   carbs: number;
   fats: number;
   source: "CUSTOM" | "SEED";
+  barcode?: string;
 }
 
 export interface AiFoodEstimate {
@@ -62,6 +63,7 @@ interface BackendFoodItem {
   carbsPer100g: number;
   fatsPer100g: number;
   source: "CUSTOM" | "SEED";
+  barcode?: string | null;
 }
 
 export const fetchFoodLogs = async (token: string, date: string): Promise<FoodLogDto[]> => {
@@ -72,6 +74,18 @@ export const fetchFoodLogs = async (token: string, date: string): Promise<FoodLo
   }
   return response.json();
 };
+
+const mapBackendItem = (item: BackendFoodItem): FoodItem => ({
+  id: item.id,
+  name: item.name,
+  brandOrPlace: item.brandOrPlace || undefined,
+  calories: item.caloriesPer100g,
+  protein: item.proteinPer100g,
+  carbs: item.carbsPer100g,
+  fats: item.fatsPer100g,
+  source: item.source,
+  barcode: item.barcode || undefined,
+});
 
 export const searchFoods = async (token: string, query: string): Promise<FoodItem[]> => {
   if (query.trim().length < 2) {
@@ -87,16 +101,18 @@ export const searchFoods = async (token: string, query: string): Promise<FoodIte
   }
 
   const items: BackendFoodItem[] = await response.json();
-  return items.map((item) => ({
-    id: item.id,
-    name: item.name,
-    brandOrPlace: item.brandOrPlace || undefined,
-    calories: item.caloriesPer100g,
-    protein: item.proteinPer100g,
-    carbs: item.carbsPer100g,
-    fats: item.fatsPer100g,
-    source: item.source,
-  }));
+  return items.map(mapBackendItem);
+};
+
+export const searchFoodByBarcode = async (token: string, code: string): Promise<FoodItem | null> => {
+  const response = await authenticatedFetch(`/food/barcode?code=${encodeURIComponent(code)}`, token, { method: "GET" });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Barcode lookup failed (${response.status})`);
+  }
+  const item: BackendFoodItem = await response.json();
+  return mapBackendItem(item);
 };
 
 export const createCustomFood = async (
@@ -108,6 +124,7 @@ export const createCustomFood = async (
     proteinPer100g: number;
     carbsPer100g: number;
     fatsPer100g: number;
+    barcode?: string;
   }
 ): Promise<FoodItem> => {
   const response = await authenticatedFetch("/food/custom", token, {
@@ -121,16 +138,7 @@ export const createCustomFood = async (
   }
 
   const item: BackendFoodItem = await response.json();
-  return {
-    id: item.id,
-    name: item.name,
-    brandOrPlace: item.brandOrPlace || undefined,
-    calories: item.caloriesPer100g,
-    protein: item.proteinPer100g,
-    carbs: item.carbsPer100g,
-    fats: item.fatsPer100g,
-    source: item.source,
-  };
+  return mapBackendItem(item);
 };
 
 export const estimateFoodPer100gWithAi = async (token: string, foodName: string, brandOrPlace?: string): Promise<AiFoodEstimate> => {
@@ -261,16 +269,7 @@ export const fetchFrequentFoods = async (token: string, limit: number = 10): Pro
   const items: BackendFoodItem[] = await response.json();
   return items
     .filter((item) => !item.name.toLowerCase().startsWith("quick fill "))
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      brandOrPlace: item.brandOrPlace || undefined,
-      calories: item.caloriesPer100g,
-      protein: item.proteinPer100g,
-      carbs: item.carbsPer100g,
-      fats: item.fatsPer100g,
-      source: item.source,
-    }));
+    .map(mapBackendItem);
 };
 
 export const fetchFavoriteFoods = async (token: string, limit: number = 20): Promise<FoodItem[]> => {
@@ -286,16 +285,7 @@ export const fetchFavoriteFoods = async (token: string, limit: number = 20): Pro
   const items: BackendFoodItem[] = await response.json();
   return items
     .filter((item) => !item.name.toLowerCase().startsWith("quick fill "))
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      brandOrPlace: item.brandOrPlace || undefined,
-      calories: item.caloriesPer100g,
-      protein: item.proteinPer100g,
-      carbs: item.carbsPer100g,
-      fats: item.fatsPer100g,
-      source: item.source,
-    }));
+    .map(mapBackendItem);
 };
 
 export const addFavoriteFood = async (token: string, foodId: number): Promise<void> => {

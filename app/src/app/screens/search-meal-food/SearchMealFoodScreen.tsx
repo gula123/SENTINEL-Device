@@ -19,12 +19,14 @@ import {
   fetchFoodPortions,
   fetchPortionTypes,
   searchFoods,
+  searchFoodByBarcode,
   type FoodItem,
   type PortionDto,
   type PortionTypeDto,
 } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
 import { setPendingMealFood } from "../../state/mealFoodPicker";
+import BarcodeScannerModal from "../../components/BarcodeScannerModal";
 
 type Props = NativeStackScreenProps<MainStackParamList, "SearchMealFood">;
 
@@ -41,6 +43,7 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
   const [portionTypes, setPortionTypes] = useState<PortionTypeDto[]>([]);
   const [searching, setSearching] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [barcodeScanning, setBarcodeScanning] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 350);
@@ -111,6 +114,29 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
     const msg = err instanceof Error ? err.message : "Something went wrong";
     if (msg === "AUTH_EXPIRED") { signOut(); return; }
     Alert.alert("Error", msg);
+  }
+
+  async function handleBarcodeScanned(code: string) {
+    setBarcodeScanning(false);
+    if (!token) return;
+    try {
+      const result = await searchFoodByBarcode(token, code);
+      if (result) {
+        setResults([result]);
+        setQuery(result.name);
+      } else {
+        Alert.alert(
+          "Not found",
+          "This product is not in our database yet.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Create this food", onPress: () => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "meal", barcode: code }) },
+          ]
+        );
+      }
+    } catch (err) {
+      handleError(err);
+    }
   }
 
   const loadPortions = async (foodId: number) => {
@@ -193,15 +219,24 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
               </View>
             ) : (
               <>
-                <TextInput
-                  value={query}
-                  onChangeText={onSearch}
-                  placeholder="Search foods..."
-                  placeholderTextColor="#9ca3af"
-                  style={s.input}
-                  autoFocus
-                  returnKeyType="search"
-                />
+                <View style={s.searchRow}>
+                  <TextInput
+                    value={query}
+                    onChangeText={onSearch}
+                    placeholder="Search foods..."
+                    placeholderTextColor="#9ca3af"
+                    style={[s.input, s.inputFlex]}
+                    autoFocus
+                    returnKeyType="search"
+                  />
+                  <Pressable
+                    onPress={() => setBarcodeScanning(true)}
+                    style={({ pressed }) => [s.scanIconBtn, pressed && s.pressed]}
+                    accessibilityLabel="Scan barcode"
+                  >
+                    <Ionicons name="barcode-outline" size={22} color="#16a34a" />
+                  </Pressable>
+                </View>
                 {searching ? <ActivityIndicator size="small" color="#16a34a" style={{ marginTop: 6 }} /> : null}
                 {results.length > 0 ? (
                   <View style={s.results}>
@@ -307,6 +342,12 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <BarcodeScannerModal
+        visible={barcodeScanning}
+        onScanned={handleBarcodeScanned}
+        onClose={() => setBarcodeScanning(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -438,4 +479,25 @@ const s = StyleSheet.create({
   createFoodBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, alignSelf: "flex-start" },
   createFoodBtnText: { fontSize: 13, color: "#16a34a", fontWeight: "600" },
   pressed: { opacity: 0.65 },
+
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  inputFlex: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  scanIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

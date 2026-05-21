@@ -27,6 +27,7 @@ import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { setPendingMealFood } from "../../state/mealFoodPicker";
 import { setPendingRecipeFood } from "../../state/recipeFoodPicker";
+import BarcodeScannerModal from "../../components/BarcodeScannerModal";
 
 const MEAL_LABEL: Record<MealType, string> = {
   BREAKFAST: "Breakfast",
@@ -44,7 +45,7 @@ const MEAL_ICON: Record<MealType, string> = {
 type Props = NativeStackScreenProps<MainStackParamList, "CreateFood">;
 
 export default function CreateFoodScreen({ route, navigation }: Props) {
-  const { meal, date, returnTo } = route.params;
+  const { meal, date, returnTo, barcode: initialBarcode } = route.params;
 
   const [customName, setCustomName] = useState("");
   const [customBrandOrPlace, setCustomBrandOrPlace] = useState("");
@@ -53,6 +54,8 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
   const [customCarbs, setCustomCarbs] = useState("0");
   const [customFats, setCustomFats] = useState("0");
   const [customGrams, setCustomGrams] = useState("100");
+  const [customBarcode, setCustomBarcode] = useState(initialBarcode ?? "");
+  const [scannerVisible, setScannerVisible] = useState(false);
   const [aiNote, setAiNote] = useState("");
 
   const { token, signOut } = useAuth();
@@ -113,6 +116,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
         proteinPer100g: Number(customProtein.replace(',', '.')) || 0,
         carbsPer100g: Number(customCarbs.replace(',', '.')) || 0,
         fatsPer100g: Number(customFats.replace(',', '.')) || 0,
+        barcode: customBarcode.trim() || undefined,
       });
 
       if (!returnTo || returnTo === "foodLog") {
@@ -134,6 +138,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
       setCustomFats("0");
       setCustomGrams("100");
       setCustomBrandOrPlace("");
+      setCustomBarcode("");
       setAiNote("");
       if (returnTo === "meal") {
         setPendingMealFood(created, g);
@@ -210,6 +215,25 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+
+            <Text style={s.inputLabel}>{t("createFood.barcode")}</Text>
+            <View style={s.inputRow}>
+              <TextInput
+                value={customBarcode}
+                onChangeText={setCustomBarcode}
+                placeholder={t("createFood.barcodePlaceholder")}
+                placeholderTextColor="#9ca3af"
+                keyboardType="numeric"
+                style={[s.input, s.inputFlex]}
+              />
+              <Pressable
+                onPress={() => setScannerVisible(true)}
+                style={({ pressed }) => [s.scanIconBtn, pressed && s.pressed]}
+                accessibilityLabel="Scan barcode"
+              >
+                <Ionicons name="barcode-outline" size={22} color="#16a34a" />
+              </Pressable>
+            </View>
 
             <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
               <Text style={s.aiBtnText}>{aiMutation.isPending ? t("createFood.estimating") : t("createFood.aiEstimate")}</Text>
@@ -326,6 +350,15 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
             <Text style={s.toastText}>✓ {toastMessage}</Text>
           </Animated.View>
         ) : null}
+
+        <BarcodeScannerModal
+          visible={scannerVisible}
+          onScanned={(code) => {
+            setCustomBarcode(code);
+            setScannerVisible(false);
+          }}
+          onClose={() => setScannerVisible(false)}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -435,6 +468,27 @@ const s = StyleSheet.create({
   doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   pressed: { opacity: 0.65 },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  inputFlex: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  scanIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   toast: {
     position: "absolute",
