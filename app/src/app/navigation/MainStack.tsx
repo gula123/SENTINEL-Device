@@ -6,6 +6,7 @@ import SearchFoodScreen from "../screens/search-food/SearchFoodScreen";
 import SearchMealFoodScreen from "../screens/search-meal-food/SearchMealFoodScreen";
 import SearchRecipeFoodScreen from "../screens/recipes/SearchRecipeFoodScreen";
 import CreateFoodScreen from "../screens/create-food/CreateFoodScreen";
+import PhotoFoodLogScreen from "../screens/photo-food-log/PhotoFoodLogScreen";
 import MealDetailScreen from "../screens/meal-detail/MealDetailScreen";
 import HabitInsightsScreen from "../screens/habits/HabitInsightsScreen";
 import CreateRecipeScreen from "../screens/recipes/CreateRecipeScreen";
@@ -48,6 +49,11 @@ export default function MainStack() {
       <Stack.Screen
         name="CreateFood"
         component={CreateFoodScreen}
+        options={{ presentation: "modal", headerShown: false }}
+      />
+      <Stack.Screen
+        name="PhotoFoodLog"
+        component={PhotoFoodLogScreen}
         options={{ presentation: "modal", headerShown: false }}
       />
         <Stack.Screen

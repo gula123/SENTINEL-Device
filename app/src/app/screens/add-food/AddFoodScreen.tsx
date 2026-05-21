@@ -193,28 +193,26 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           <View style={s.actionsCard}>
             <Pressable
               onPress={() => navigation.navigate("SearchFood", { meal, date })}
-              style={({ pressed }) => [s.actionBtn, s.searchBtn, pressed && s.pressed]}
+              style={({ pressed }) => [s.actionTile, s.searchBtn, pressed && s.pressed]}
             >
-              <Text style={s.actionBtnIcon}>🔍</Text>
-              <View style={s.actionBtnContent}>
-                <Text style={s.actionBtnTitle}>{t("addFood.searchFood")}</Text>
-                <Text style={s.actionBtnSubtitle} numberOfLines={1}>
-                  {t("addFood.searchSubtitle")}
-                </Text>
-              </View>
+              <Text style={s.actionTileIcon}>🔍</Text>
+              <Text style={s.actionTileLabel}>{t("addFood.searchFood")}</Text>
             </Pressable>
 
             <Pressable
               onPress={() => navigation.navigate("CreateFood", { meal, date })}
-              style={({ pressed }) => [s.actionBtn, s.createBtn, pressed && s.pressed]}
+              style={({ pressed }) => [s.actionTile, s.createBtn, pressed && s.pressed]}
             >
-              <Text style={s.actionBtnIcon}>➕</Text>
-              <View style={s.actionBtnContent}>
-                <Text style={s.actionBtnTitle}>{t("addFood.createFood")}</Text>
-                <Text style={s.actionBtnSubtitle} numberOfLines={1}>
-                  {t("addFood.createSubtitle")}
-                </Text>
-              </View>
+              <Text style={s.actionTileIcon}>➕</Text>
+              <Text style={s.actionTileLabel}>{t("addFood.createFood")}</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => navigation.navigate("PhotoFoodLog", { meal, date })}
+              style={({ pressed }) => [s.actionTile, s.photoBtn, pressed && s.pressed]}
+            >
+              <Text style={s.actionTileIcon}>📷</Text>
+              <Text style={s.actionTileLabel}>{t("addFood.photoFood")}</Text>
             </Pressable>
           </View>
 
@@ -403,45 +401,45 @@ const s = StyleSheet.create({
 
   actionsCard: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
   },
 
-  actionBtn: {
-    flexDirection: "row",
+  actionTile: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#fff",
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    gap: 8,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    flex: 1,
   },
-  actionBtnContent: {
-    flex: 1,
-    minWidth: 0,
+  actionTileIcon: {
+    fontSize: 26,
+  },
+  actionTileLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "center",
   },
   searchBtn: {
-    borderColor: "#bbf7d0",
+    borderColor: "#6ee7b7",
     backgroundColor: "#f0fdf4",
   },
   createBtn: {
-    borderColor: "#bfdbfe",
+    borderColor: "#93c5fd",
     backgroundColor: "#eff6ff",
   },
-  actionBtnIcon: {
-    fontSize: 22,
-  },
-  actionBtnTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  actionBtnSubtitle: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
+  photoBtn: {
+    borderColor: "#c4b5fd",
+    backgroundColor: "#faf5ff",
   },
 
   footer: {

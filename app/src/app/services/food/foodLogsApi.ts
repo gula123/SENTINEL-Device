@@ -215,6 +215,108 @@ export const deleteFoodLog = async (token: string, logId: number): Promise<void>
   }
 };
 
+// ── Photo AI analysis ────────────────────────────────────────────────────────
+
+export interface PhotoAnalyzedItem {
+  suggestedFoodId?: number;
+  suggestedFoodName: string;
+  estimatedGrams: number;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatsPer100g: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  foundInDb: boolean;
+}
+
+export interface PhotoCreateEstimate {
+  name: string;
+  brandOrPlace?: string;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatsPer100g: number;
+}
+
+export const analyzePhotoForLog = async (
+  token: string,
+  imageBase64: string,
+  mimeType: string,
+  hint?: string
+): Promise<PhotoAnalyzedItem[]> => {
+  const response = await authenticatedFetch("/food/photo-analyze", token, {
+    method: "POST",
+    body: JSON.stringify({ imageBase64, mimeType, hint }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      throw new Error(parsed.error || `Photo analysis failed (${response.status})`);
+    } catch {
+      throw new Error(text || `Photo analysis failed (${response.status})`);
+    }
+  }
+
+  return response.json();
+};
+
+export const analyzePhotoForCreateFood = async (
+  token: string,
+  imageBase64: string,
+  mimeType: string,
+  hint?: string
+): Promise<PhotoCreateEstimate> => {
+  const response = await authenticatedFetch("/food/photo-create-estimate", token, {
+    method: "POST",
+    body: JSON.stringify({ imageBase64, mimeType, hint }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      throw new Error(parsed.error || `Photo analysis failed (${response.status})`);
+    } catch {
+      throw new Error(text || `Photo analysis failed (${response.status})`);
+    }
+  }
+
+  return response.json();
+};
+
+export const addAiPhotoFoodLog = async (
+  token: string,
+  payload: {
+    aiEstimatedName: string;
+    grams: number;
+    mealType: MealType;
+    logDate: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+  }
+): Promise<FoodLogDto> => {
+  const response = await authenticatedFetch("/food/logs", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to add AI photo food log (${response.status})`);
+  }
+
+  return response.json();
+};
+
 export const fetchFoodPortions = async (token: string, foodId: number): Promise<PortionDto[]> => {
   const response = await authenticatedFetch(`/food/portions?foodId=${foodId}`, token, { method: "GET" });
   if (!response.ok) {

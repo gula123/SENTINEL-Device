@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,11 +17,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import {
   createCustomFood,
   estimateFoodPer100gWithAi,
+  analyzePhotoForCreateFood,
   type AiFoodEstimate,
   type MealType,
 } from "../../services/food/foodLogsApi";
@@ -57,6 +61,11 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
   const [customBarcode, setCustomBarcode] = useState(initialBarcode ?? "");
   const [scannerVisible, setScannerVisible] = useState(false);
   const [aiNote, setAiNote] = useState("");
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [photoHint, setPhotoHint] = useState("");
+  const [photoAnalyzing, setPhotoAnalyzing] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
 
   const { token, signOut } = useAuth();
   const { t } = useLanguage();
@@ -180,6 +189,29 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const onPhotoCapture = async () => {
+    if (!cameraRef.current || !token) return;
+    setPhotoAnalyzing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
+      if (!photo?.base64) throw new Error("No image data");
+      const result = await analyzePhotoForCreateFood(token, photo.base64, "image/jpeg", photoHint || undefined);
+      setCustomName(result.name || customName);
+      if (result.brandOrPlace) setCustomBrandOrPlace(result.brandOrPlace);
+      setCustomCalories(String(Math.round(result.caloriesPer100g)));
+      setCustomProtein(String(Math.round(result.proteinPer100g * 10) / 10));
+      setCustomCarbs(String(Math.round(result.carbsPer100g * 10) / 10));
+      setCustomFats(String(Math.round(result.fatsPer100g * 10) / 10));
+      setAiNote(t("createFood.photoFilled"));
+      setPhotoModalVisible(false);
+      setPhotoHint("");
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setPhotoAnalyzing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -232,6 +264,13 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
                 accessibilityLabel="Scan barcode"
               >
                 <Ionicons name="barcode-outline" size={22} color="#16a34a" />
+              </Pressable>
+              <Pressable
+                onPress={() => setPhotoModalVisible(true)}
+                style={({ pressed }) => [s.scanIconBtn, pressed && s.pressed]}
+                accessibilityLabel={t("createFood.analyzePhoto")}
+              >
+                <Ionicons name="camera-outline" size={22} color="#16a34a" />
               </Pressable>
             </View>
 
@@ -359,6 +398,50 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
           }}
           onClose={() => setScannerVisible(false)}
         />
+
+        {/* Photo capture modal */}
+        <Modal visible={photoModalVisible} animationType="slide" onRequestClose={() => setPhotoModalVisible(false)}>
+          <View style={ps.container}>
+            {cameraPermission?.granted ? (
+              <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+            ) : (
+              <View style={ps.permissionBox}>
+                <Text style={ps.permissionText}>{t("barcodeScanner.permissionRequired")}</Text>
+                <Pressable style={ps.grantBtn} onPress={requestCameraPermission}>
+                  <Text style={ps.grantBtnText}>{t("barcodeScanner.grantPermission")}</Text>
+                </Pressable>
+              </View>
+            )}
+            <View style={ps.overlay} pointerEvents="none" />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={ps.bottom}
+            >
+              <Text style={ps.label}>{t("createFood.photoHint")}</Text>
+              <TextInput
+                style={ps.hintInput}
+                value={photoHint}
+                onChangeText={setPhotoHint}
+                placeholder={t("createFood.photoHintPlaceholder")}
+                placeholderTextColor="#9ca3af"
+              />
+              {photoAnalyzing ? (
+                <View style={ps.analyzingRow}>
+                  <ActivityIndicator color="#16a34a" />
+                  <Text style={ps.analyzingText}>{t("photoLog.analyzing")}</Text>
+                </View>
+              ) : (
+                <Pressable style={ps.captureBtn} onPress={onPhotoCapture} disabled={!cameraPermission?.granted}>
+                  <Ionicons name="camera" size={24} color="#fff" />
+                  <Text style={ps.captureBtnText}>{t("createFood.analyzePhotoBtn")}</Text>
+                </Pressable>
+              )}
+              <Pressable style={ps.cancelBtn} onPress={() => { setPhotoModalVisible(false); setPhotoHint(""); }}>
+                <Text style={ps.cancelBtnText}>{t("common.cancel")}</Text>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -507,4 +590,48 @@ const s = StyleSheet.create({
     elevation: 8,
   },
   toastText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+});
+
+const ps = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#000" },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.3)" },
+  bottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    padding: 20,
+    paddingBottom: 40,
+    gap: 10,
+  },
+  label: { color: "#d1fae5", fontSize: 13, fontWeight: "600" },
+  hintInput: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  captureBtn: {
+    flexDirection: "row",
+    backgroundColor: "#16a34a",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  captureBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  analyzingRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14 },
+  analyzingText: { color: "#d1fae5", fontWeight: "600" },
+  cancelBtn: { alignItems: "center", paddingVertical: 10 },
+  cancelBtnText: { color: "#d1fae5", fontWeight: "600", fontSize: 15 },
+  permissionBox: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
+  permissionText: { color: "#fff", textAlign: "center", fontSize: 15 },
+  grantBtn: { backgroundColor: "#16a34a", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12 },
+  grantBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });

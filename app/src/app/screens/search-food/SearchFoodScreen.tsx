@@ -858,6 +858,7 @@ const s = StyleSheet.create({
   headerIcon: { fontSize: 20 },
   headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
   headerDate: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
 
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
