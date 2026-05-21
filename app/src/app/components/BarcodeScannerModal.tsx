@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { useLanguage } from "../state/LanguageContext";
 
 interface Props {
   visible: boolean;
@@ -10,6 +11,7 @@ interface Props {
 
 export default function BarcodeScannerModal({ visible, onScanned, onClose }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
+  const { t } = useLanguage();
   // Prevent double-fire: ignore subsequent scans until modal is closed & reopened
   const scannedRef = useRef(false);
 
@@ -32,7 +34,7 @@ export default function BarcodeScannerModal({ visible, onScanned, onClose }: Pro
     return (
       <Modal visible animationType="slide" onRequestClose={onClose}>
         <View style={s.center}>
-          <Text style={s.message}>Requesting camera permission…</Text>
+          <Text style={s.message}>{t("barcodeScanner.requestingPermission")}</Text>
         </View>
       </Modal>
     );
@@ -43,12 +45,12 @@ export default function BarcodeScannerModal({ visible, onScanned, onClose }: Pro
     return (
       <Modal visible animationType="slide" onRequestClose={onClose}>
         <View style={s.center}>
-          <Text style={s.message}>Camera access is required to scan barcodes.</Text>
+          <Text style={s.message}>{t("barcodeScanner.permissionRequired")}</Text>
           <Pressable style={s.grantBtn} onPress={requestPermission}>
-            <Text style={s.grantBtnText}>Grant Permission</Text>
+            <Text style={s.grantBtnText}>{t("barcodeScanner.grantPermission")}</Text>
           </Pressable>
           <Pressable style={s.cancelBtn} onPress={onClose}>
-            <Text style={s.cancelBtnText}>Cancel</Text>
+            <Text style={s.cancelBtnText}>{t("common.cancel")}</Text>
           </Pressable>
         </View>
       </Modal>
@@ -86,13 +88,13 @@ export default function BarcodeScannerModal({ visible, onScanned, onClose }: Pro
 
         {/* Labels */}
         <View style={s.labelContainer} pointerEvents="none">
-          <Text style={s.title}>Scan Barcode</Text>
-          <Text style={s.hint}>Point the camera at a product barcode</Text>
+          <Text style={s.title}>{t("barcodeScanner.title")}</Text>
+          <Text style={s.hint}>{t("barcodeScanner.hint")}</Text>
         </View>
 
         {/* Cancel */}
         <Pressable style={s.cancelBtn} onPress={onClose}>
-          <Text style={s.cancelBtnText}>Cancel</Text>
+          <Text style={s.cancelBtnText}>{t("common.cancel")}</Text>
         </Pressable>
       </View>
     </Modal>
