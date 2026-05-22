@@ -227,6 +227,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          {/* ── Food Details ── */}
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("createFood.cardTitle")}</Text>
             <Text style={s.helperText}>{t("createFood.helpText")}</Text>
@@ -265,16 +266,23 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               >
                 <Ionicons name="barcode-outline" size={22} color="#16a34a" />
               </Pressable>
-              <Pressable
-                onPress={() => setPhotoModalVisible(true)}
-                style={({ pressed }) => [s.scanIconBtn, pressed && s.pressed]}
-                accessibilityLabel={t("createFood.analyzePhoto")}
-              >
-                <Ionicons name="camera-outline" size={22} color="#16a34a" />
-              </Pressable>
             </View>
 
+            <Pressable
+              onPress={() => setPhotoModalVisible(true)}
+              style={({ pressed }) => [s.photoFillBtn, pressed && s.pressed]}
+            >
+              <Ionicons name="camera-outline" size={18} color="#7c3aed" />
+              <Text style={s.photoFillBtnText}>{t("createFood.fillFromPhoto")}</Text>
+            </Pressable>
+          </View>
+
+          {/* ── Nutrition per 100g ── */}
+          <View style={s.card}>
+            <Text style={s.cardTitle}>{t("createFood.nutritionTitle")}</Text>
+
             <Pressable onPress={onAiEstimate} style={({ pressed }) => [s.aiBtn, pressed && s.pressed]}>
+              <Ionicons name="flash-outline" size={15} color="#166534" />
               <Text style={s.aiBtnText}>{aiMutation.isPending ? t("createFood.estimating") : t("createFood.aiEstimate")}</Text>
             </Pressable>
             {aiNote ? <Text style={s.aiNote}>{aiNote}</Text> : null}
@@ -315,6 +323,11 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               placeholderTextColor="#9ca3af"
               style={s.input}
             />
+          </View>
+
+          {/* ── Log Amount ── */}
+          <View style={s.card}>
+            <Text style={s.cardTitle}>{t("createFood.logAmountTitle")}</Text>
             <Text style={s.inputLabel}>{returnTo === "meal" || returnTo === "recipe" ? "Grams" : t("createFood.eatenGrams")}</Text>
             <TextInput
               value={customGrams}
@@ -417,14 +430,6 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               behavior={Platform.OS === "ios" ? "padding" : undefined}
               style={ps.bottom}
             >
-              <Text style={ps.label}>{t("createFood.photoHint")}</Text>
-              <TextInput
-                style={ps.hintInput}
-                value={photoHint}
-                onChangeText={setPhotoHint}
-                placeholder={t("createFood.photoHintPlaceholder")}
-                placeholderTextColor="#9ca3af"
-              />
               {photoAnalyzing ? (
                 <View style={ps.analyzingRow}>
                   <ActivityIndicator color="#16a34a" />
@@ -436,7 +441,7 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
                   <Text style={ps.captureBtnText}>{t("createFood.analyzePhotoBtn")}</Text>
                 </Pressable>
               )}
-              <Pressable style={ps.cancelBtn} onPress={() => { setPhotoModalVisible(false); setPhotoHint(""); }}>
+              <Pressable style={ps.cancelBtn} onPress={() => setPhotoModalVisible(false)}>
                 <Text style={ps.cancelBtnText}>{t("common.cancel")}</Text>
               </Pressable>
             </KeyboardAvoidingView>
@@ -512,15 +517,31 @@ const s = StyleSheet.create({
   previewItem: { fontSize: 12, color: "#374151", fontWeight: "600" },
 
   aiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     backgroundColor: "#f0fdf4",
     borderWidth: 1,
     borderColor: "#bbf7d0",
     borderRadius: 10,
     paddingVertical: 8,
-    alignItems: "center",
   },
   aiBtnText: { fontSize: 13, fontWeight: "700", color: "#166534" },
   aiNote: { fontSize: 11, color: "#6b7280", fontStyle: "italic" },
+  photoFillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#faf5ff",
+    borderWidth: 1,
+    borderColor: "#c4b5fd",
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  photoFillBtnText: { fontSize: 13, fontWeight: "700", color: "#7c3aed" },
 
   addBtn: {
     backgroundColor: "#16a34a",
