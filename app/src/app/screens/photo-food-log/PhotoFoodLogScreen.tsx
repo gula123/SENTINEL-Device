@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -47,6 +48,8 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
   const [logging, setLogging] = useState(false);
   const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
   const [capturedMimeType] = useState("image/jpeg");
+  const [showReanalyzeModal, setShowReanalyzeModal] = useState(false);
+  const [modalHint, setModalHint] = useState("");
 
   const handleCapture = async () => {
     if (!cameraRef.current) return;
@@ -66,10 +69,12 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
 
   const handleReanalyze = async () => {
     if (!capturedBase64) return;
+    setShowReanalyzeModal(false);
+    setHint(modalHint);
     setAnalyzing(true);
     setStage("reviewing");
     try {
-      await runAnalysis(capturedBase64, capturedMimeType, hint);
+      await runAnalysis(capturedBase64, capturedMimeType, modalHint);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       if (msg === "AUTH_EXPIRED") { signOut(); return; }
@@ -167,7 +172,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
   }
 
   // ── Capture stage ──────────────────────────────────────────────────────────
-  if (stage === "capture" || (stage === "reviewing" && analyzing && items.length === 0)) {
+  if (stage === "capture") {
     return (
       <View style={s.container}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
@@ -177,14 +182,6 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={s.captureBottom}
         >
-          <TextInput
-            style={s.hintInputCapture}
-            value={hint}
-            onChangeText={setHint}
-            placeholder={t("photoLog.hintPlaceholder")}
-            placeholderTextColor="rgba(255,255,255,0.4)"
-          />
-
           {analyzing ? (
             <View style={s.analyzingRowCapture}>
               <ActivityIndicator color="#16a34a" />
@@ -200,7 +197,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
             </Pressable>
           )}
 
-          <Pressable style={s.cancelBtnCapture} onPress={() => navigation.goBack()}>
+          <Pressable style={s.cancelBtnCapture} onPress={() => capturedBase64 ? setStage("reviewing") : navigation.goBack()}>
             <Text style={s.cancelBtnCaptureText}>{t("common.cancel")}</Text>
           </Pressable>
         </KeyboardAvoidingView>
@@ -231,30 +228,57 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
           <View style={{ width: 36 }} />
         </View>
 
-        {/* Re-analyze bar */}
-        <View style={s.reanalyzeBar}>
-          <TextInput
-            style={s.hintInput}
-            value={hint}
-            onChangeText={setHint}
-            placeholder={t("photoLog.hintPlaceholder")}
-            placeholderTextColor="#9ca3af"
-          />
-          <Pressable
-            style={({ pressed }) => [s.reanalyzeBtn, pressed && s.pressed, analyzing && s.reanaBtnDisabled]}
-            onPress={handleReanalyze}
-            disabled={analyzing}
-          >
-            {analyzing ? (
-              <ActivityIndicator size="small" color="#16a34a" />
-            ) : (
-              <>
-                <Ionicons name="refresh-outline" size={14} color="#16a34a" />
-                <Text style={s.reanaBtnText}>{t("photoLog.reanalyze")}</Text>
-              </>
-            )}
+        {/* Re-analyze modal */}
+        <Modal
+          visible={showReanalyzeModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowReanalyzeModal(false)}
+        >
+          <Pressable style={s.modalBackdrop} onPress={() => setShowReanalyzeModal(false)}>
+            <Pressable style={s.modalCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={s.modalTitle}>{t("photoLog.contextModalTitle")}</Text>
+              <Text style={s.modalDesc}>{t("photoLog.contextModalDesc")}</Text>
+              <View style={s.modalInputWrap}>
+                <TextInput
+                  style={s.modalInput}
+                  value={modalHint}
+                  onChangeText={setModalHint}
+                  placeholder={t("photoLog.hintPlaceholder")}
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  autoFocus
+                />
+                {modalHint.length > 0 && (
+                  <Pressable
+                    style={s.clearBtn}
+                    onPress={() => setModalHint("")}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                  </Pressable>
+                )}
+              </View>
+              <View style={s.modalActions}>
+                <Pressable
+                  style={({ pressed }) => [s.modalCancelBtn, pressed && s.pressed]}
+                  onPress={() => setShowReanalyzeModal(false)}
+                >
+                  <Text style={s.modalCancelText}>{t("common.cancel")}</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [s.modalConfirmBtn, pressed && s.pressed]}
+                  onPress={handleReanalyze}
+                >
+                  <Ionicons name="refresh-outline" size={16} color="#fff" />
+                  <Text style={s.modalConfirmText}>{t("photoLog.reanalyze")}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </View>
+        </Modal>
 
         <ScrollView
           style={s.list}
@@ -273,6 +297,10 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
               <Text style={s.analyzingText}>{t("photoLog.analyzing")}</Text>
             </View>
           )}
+          {!analyzing && items.length > 0 && (
+            <Text style={s.listSectionTitle}>{t("photoLog.identifiedItems")}</Text>
+          )}
+
           {!analyzing && items.map((item) => (
             <PhotoItemCard
               key={item.key}
@@ -281,16 +309,29 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
               onRemove={() => handleRemove(item.key)}
             />
           ))}
+
+          {!analyzing && (
+            <View style={s.improvePrompt}>
+              <Text style={s.improvePromptQuestion}>{t("photoLog.wrongAssumption")}</Text>
+              <Pressable
+                style={({ pressed }) => [s.improvePromptBtn, pressed && s.pressed]}
+                onPress={() => { setModalHint(hint); setShowReanalyzeModal(true); }}
+              >
+                <Ionicons name="add-circle-outline" size={14} color="#16a34a" />
+                <Text style={s.improvePromptBtnText}>{t("photoLog.improveByContext")}</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
 
         {/* Footer */}
         <View style={s.footer}>
           <Pressable
-            style={({ pressed }) => [s.addManuallyBtn, pressed && s.pressed]}
-            onPress={() => navigation.navigate("SearchFood", { meal, date })}
+            style={({ pressed }) => [s.retakeBtn, pressed && s.pressed]}
+            onPress={() => { setStage("capture"); }}
           >
-            <Ionicons name="add" size={16} color="#16a34a" />
-            <Text style={s.addManuallyText}>{t("photoLog.addManually")}</Text>
+            <Ionicons name="camera-outline" size={16} color="#6b7280" />
+            <Text style={s.retakeBtnText}>{t("photoLog.retakePhoto")}</Text>
           </Pressable>
 
           {items.length > 0 && (
@@ -412,42 +453,111 @@ const s = StyleSheet.create({
     gap: 6,
   },
   headerText: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  reanalyzeBar: {
+  listSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#9ca3af",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  improvePrompt: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    justifyContent: "space-between",
+    marginTop: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderColor: "#f3f4f6",
-  },
-  hintInput: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-    color: "#111827",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 13,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+    gap: 10,
   },
-  reanalyzeBtn: {
+  improvePromptQuestion: {
+    fontSize: 13,
+    color: "#6b7280",
+    flex: 1,
+  },
+  improvePromptBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     backgroundColor: "#f0fdf4",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#bbf7d0",
-    minWidth: 90,
-    justifyContent: "center",
   },
+  improvePromptBtnText: { color: "#16a34a", fontWeight: "700", fontSize: 12 },
   reanaBtnDisabled: { opacity: 0.5 },
-  reanaBtnText: { color: "#16a34a", fontWeight: "700", fontSize: 13 },
+  // Re-analyze modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 20,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
+  modalDesc: { fontSize: 13, color: "#6b7280", lineHeight: 19 },
+  modalInputWrap: { position: "relative" },
+  modalInput: {
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingRight: 38,
+    fontSize: 14,
+    color: "#111827",
+    minHeight: 90,
+  },
+  clearBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+    alignItems: "center",
+  },
+  modalCancelText: { color: "#6b7280", fontWeight: "600", fontSize: 14 },
+  modalConfirmBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#16a34a",
+  },
+  modalConfirmText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   list: { flex: 1 },
   listContent: {
     padding: 16,
@@ -486,18 +596,18 @@ const s = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  addManuallyBtn: {
+  retakeBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
   },
-  addManuallyText: { color: "#15803d", fontWeight: "600", fontSize: 14 },
+  retakeBtnText: { color: "#6b7280", fontWeight: "600", fontSize: 14 },
   logAllBtn: {
     backgroundColor: "#16a34a",
     flexDirection: "row",
