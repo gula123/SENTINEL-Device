@@ -120,6 +120,7 @@ export function RecipesSection({
           keyExtractor={(item) => String(item.id)}
           style={s.list}
           nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item: recipe }) => {
             const expanded = expandedRecipeId === recipe.id;
             const isLogging = loggingRecipeId === recipe.id;
@@ -207,6 +208,8 @@ export function RecipesSection({
                         }}
                         defaultValue={usePortion ? "1" : "100"}
                         keyboardType="numeric"
+                        returnKeyType="done"
+                        onSubmitEditing={() => handleLog(recipe, grams, usePortion ? "portion" : "grams")}
                         placeholder={usePortion ? t("recipes.amountPlaceholder") : t("recipes.gramsPlaceholder")}
                         placeholderTextColor="#9ca3af"
                         style={s.input}

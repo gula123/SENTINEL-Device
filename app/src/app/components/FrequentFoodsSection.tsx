@@ -355,6 +355,7 @@ export function FrequentFoodsSection({
           keyExtractor={(item) => String(item.id)}
           style={s.list}
           nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           ListFooterComponent={
@@ -441,6 +442,8 @@ export function FrequentFoodsSection({
                           onChangeText={(v) => setPortionAmountByFoodId((prev) => ({ ...prev, [food.id]: v }))}
                           defaultValue="1"
                           keyboardType="numeric"
+                          returnKeyType="done"
+                          onSubmitEditing={() => onAdd(food)}
                           placeholder="Amount"
                           placeholderTextColor="#9ca3af"
                           style={s.input}
@@ -451,6 +454,8 @@ export function FrequentFoodsSection({
                           onChangeText={(v) => setGramsByFoodId((prev) => ({ ...prev, [food.id]: v }))}
                           defaultValue="100"
                           keyboardType="numeric"
+                          returnKeyType="done"
+                          onSubmitEditing={() => onAdd(food)}
                           placeholder="Grams"
                           placeholderTextColor="#9ca3af"
                           style={s.input}
