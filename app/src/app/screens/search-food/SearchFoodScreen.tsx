@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
-import { useAddFoodLog } from "../../hooks/useFoodDiary";
+import { useAddFoodLog, useFoodLogs } from "../../hooks/useFoodDiary";
 import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import {
   addFavoriteFood,
@@ -410,6 +410,12 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
     }
   };
 
+  const logsQuery = useFoodLogs(date);
+  const loggedCount = useMemo(
+    () => (logsQuery.data || []).filter((l) => l.mealType === meal).length,
+    [logsQuery.data, meal]
+  );
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -421,6 +427,11 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
             <Text style={s.headerText}>{t("searchFood.title")} - {t(`home.${meal.toLowerCase()}`)}</Text>
           </View>
+          {loggedCount > 0 && (
+            <View style={s.loggedBadge}>
+              <Text style={s.loggedBadgeText}>{t("searchFood.loggedBadge").replace("{count}", String(loggedCount))}</Text>
+            </View>
+          )}
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
@@ -857,11 +868,26 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerContent: { flex: 1, flexDirection: "column", gap: 1 },
   headerTitle: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   headerIcon: { fontSize: 20 },
   headerText: { fontSize: 18, fontWeight: "700", color: "#111827" },
   headerDate: { fontSize: 12, color: "#16a34a", fontWeight: "700" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  loggedBadge: {
+    backgroundColor: "#dcfce7",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+  },
+  loggedBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#16a34a",
+  },
+  loggedSubtext: { fontSize: 12, color: "#16a34a", fontWeight: "600", marginLeft: 2 },
 
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 

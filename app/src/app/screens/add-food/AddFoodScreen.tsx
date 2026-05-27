@@ -7,7 +7,7 @@ import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useFrequentFoods } from "../../hooks/useFrequentFoods";
 import { useFavoriteFoods } from "../../hooks/useFavoriteFoods";
 import { FrequentFoodsSection } from "../../components/FrequentFoodsSection";
-import { useAddFoodLog } from "../../hooks/useFoodDiary";
+import { useAddFoodLog, useFoodLogs } from "../../hooks/useFoodDiary";
 import { useSavedMeals, useLogSavedMeal, useReorderSavedMeals } from "../../hooks/useSavedMeals";
 import { SavedMealsSection } from "../../components/SavedMealsSection";
 import { RecipesSection } from "../../components/RecipesSection";
@@ -44,6 +44,16 @@ export default function AddFoodScreen({ route, navigation }: Props) {
   const addMutation = useAddFoodLog(date);
   const [togglingFavoriteFoodId, setTogglingFavoriteFoodId] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<FoodQuickSection>("frequent");
+  const [loggedExpanded, setLoggedExpanded] = useState(false);
+  const logsQuery = useFoodLogs(date);
+  const mealLogs = useMemo(
+    () => (logsQuery.data || []).filter((l) => l.mealType === meal),
+    [logsQuery.data, meal]
+  );
+  const totalKcal = useMemo(
+    () => Math.round(mealLogs.reduce((sum, l) => sum + l.calories, 0)),
+    [mealLogs]
+  );
   const savedMealsQuery = useSavedMeals();
   const logSavedMealMutation = useLogSavedMeal(date);
   const reorderSavedMealsMutation = useReorderSavedMeals();
@@ -190,6 +200,41 @@ export default function AddFoodScreen({ route, navigation }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          {mealLogs.length > 0 && (
+            <Pressable
+              style={({ pressed }) => [s.loggedCard, pressed && s.pressed]}
+              onPress={() => setLoggedExpanded((v) => !v)}
+              accessibilityRole="button"
+            >
+              <View style={s.loggedHeader}>
+                <Text style={s.loggedHeaderText}>
+                  📋 {t("addFood.loggedSoFar")}
+                </Text>
+                <Text style={s.loggedHeaderSummary}>
+                  {t("addFood.loggedSummary")
+                    .replace("{count}", String(mealLogs.length))
+                    .replace("{kcal}", String(totalKcal))}
+                </Text>
+                <Ionicons
+                  name={loggedExpanded ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color="#16a34a"
+                />
+              </View>
+              {loggedExpanded && (
+                <View style={s.loggedList}>
+                  {mealLogs.map((item) => (
+                    <View key={item.id} style={s.loggedItemRow}>
+                      <Text style={s.loggedItemName} numberOfLines={1}>
+                        {item.foodName} ({Math.round(item.grams)}g)
+                      </Text>
+                      <Text style={s.loggedItemKcal}>{Math.round(item.calories)} kcal</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Pressable>
+          )}
           <View style={s.actionsCard}>
             <Pressable
               onPress={() => navigation.navigate("SearchFood", { meal, date })}
@@ -397,6 +442,53 @@ const s = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: "#166534",
+  },
+
+  loggedCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: "#16a34a",
+    gap: 8,
+  },
+  loggedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  loggedHeaderText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#16a34a",
+    flex: 1,
+  },
+  loggedHeaderSummary: {
+    fontSize: 13,
+    color: "#15803d",
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  loggedList: {
+    gap: 4,
+    marginTop: 2,
+  },
+  loggedItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 3,
+  },
+  loggedItemName: {
+    fontSize: 13,
+    color: "#374151",
+    flex: 1,
+    marginRight: 8,
+  },
+  loggedItemKcal: {
+    fontSize: 13,
+    color: "#16a34a",
+    fontWeight: "600",
   },
 
   actionsCard: {
