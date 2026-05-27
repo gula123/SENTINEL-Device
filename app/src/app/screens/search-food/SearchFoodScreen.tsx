@@ -278,7 +278,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
         setRecipeResults([]);
         setSelectedRecipe(null);
         setGrams("100");
-        showToast(`${t("searchFood.addedTo")} ${t(`home.${meal.toLowerCase()}`)}`);
+        showToast(t("searchFood.addedTo").replace("{meal}", t(`home.${meal.toLowerCase()}`)));
       } catch (err) {
         handleError(err);
       } finally {
@@ -311,7 +311,7 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
       setSelectedPortionId(null);
       setPortionAmount("1");
       setGrams("100");
-      showToast(`${t("searchFood.addedTo")} ${t(`home.${meal.toLowerCase()}`)}`);
+      showToast(t("searchFood.addedTo").replace("{meal}", t(`home.${meal.toLowerCase()}`)));
     } catch (err) {
       handleError(err);
     }
