@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { ClearOnFocusInput } from "../../components/ClearOnFocusInput";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import {
@@ -314,9 +315,10 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
             {selectedFood ? (
               <View style={s.row}>
                 {selectedPortion ? (
-                  <TextInput
+                  <ClearOnFocusInput
                     value={portionAmount}
                     onChangeText={setPortionAmount}
+                    defaultValue="1"
                     keyboardType="numeric"
                     placeholder="Amount"
                     placeholderTextColor="#9ca3af"
@@ -324,9 +326,10 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
                     returnKeyType="done"
                   />
                 ) : (
-                  <TextInput
+                  <ClearOnFocusInput
                     value={grams}
                     onChangeText={setGrams}
+                    defaultValue="100"
                     keyboardType="numeric"
                     placeholder="Grams"
                     placeholderTextColor="#9ca3af"

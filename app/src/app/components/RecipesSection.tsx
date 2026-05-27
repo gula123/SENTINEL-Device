@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ClearOnFocusInput } from "./ClearOnFocusInput";
 import type { RecipeDto } from "../services/food/recipesApi";
 import { useLanguage } from "../state/LanguageContext";
 
@@ -195,7 +196,7 @@ export function RecipesSection({
                     </View>
 
                     <View style={s.controlsRow}>
-                      <TextInput
+                      <ClearOnFocusInput
                         value={usePortion ? (portionAmountByRecipeId[recipe.id] ?? "1") : (gramsInput[recipe.id] ?? "100")}
                         onChangeText={(v) => {
                           if (usePortion) {
@@ -204,6 +205,7 @@ export function RecipesSection({
                             setGramsInput((prev) => ({ ...prev, [recipe.id]: v }));
                           }
                         }}
+                        defaultValue={usePortion ? "1" : "100"}
                         keyboardType="numeric"
                         placeholder={usePortion ? t("recipes.amountPlaceholder") : t("recipes.gramsPlaceholder")}
                         placeholderTextColor="#9ca3af"

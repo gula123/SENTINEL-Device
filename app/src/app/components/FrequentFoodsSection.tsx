@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, LayoutAnimation, Platform, Pressable, StyleSheet, Text, TextInput, UIManager, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ClearOnFocusInput } from "./ClearOnFocusInput";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -435,18 +436,20 @@ export function FrequentFoodsSection({
 
                     <View style={s.controlsRow}>
                       {selectedPortion ? (
-                        <TextInput
+                        <ClearOnFocusInput
                           value={portionAmountByFoodId[food.id] ?? "1"}
                           onChangeText={(v) => setPortionAmountByFoodId((prev) => ({ ...prev, [food.id]: v }))}
+                          defaultValue="1"
                           keyboardType="numeric"
                           placeholder="Amount"
                           placeholderTextColor="#9ca3af"
                           style={s.input}
                         />
                       ) : (
-                        <TextInput
+                        <ClearOnFocusInput
                           value={gramsByFoodId[food.id] ?? "100"}
                           onChangeText={(v) => setGramsByFoodId((prev) => ({ ...prev, [food.id]: v }))}
+                          defaultValue="100"
                           keyboardType="numeric"
                           placeholder="Grams"
                           placeholderTextColor="#9ca3af"

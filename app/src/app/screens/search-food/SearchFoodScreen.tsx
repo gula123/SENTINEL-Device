@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { ClearOnFocusInput } from "../../components/ClearOnFocusInput";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -635,9 +636,10 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 </View>
               </View>
               <View style={s.row}>
-              <TextInput
+              <ClearOnFocusInput
                 value={selectedPortion ? portionAmount : grams}
                 onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
+                defaultValue={selectedPortion ? "1" : "100"}
                 keyboardType="numeric"
                 placeholder={selectedPortion ? t("searchFood.amount") : t("searchFood.grams")}
                 placeholderTextColor="#9ca3af"
@@ -655,9 +657,10 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
               </>
               ) : selectedFood ? (
               <View style={s.row}>
-              <TextInput
+              <ClearOnFocusInput
                 value={selectedPortion ? portionAmount : grams}
                 onChangeText={selectedPortion ? onChangePortionAmount : onChangeGrams}
+                defaultValue={selectedPortion ? "1" : "100"}
                 keyboardType="numeric"
                 placeholder={selectedPortion ? t("searchFood.amount") : t("searchFood.grams")}
                 placeholderTextColor="#9ca3af"
@@ -773,9 +776,10 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                 </View>
 
                 <View style={s.row}>
-                  <TextInput
+                  <ClearOnFocusInput
                     value={newPortionGrams}
                     onChangeText={setNewPortionGrams}
+                    defaultValue="100"
                     keyboardType="numeric"
                     placeholder={t("searchFood.savePortionGrams")}
                     placeholderTextColor="#9ca3af"

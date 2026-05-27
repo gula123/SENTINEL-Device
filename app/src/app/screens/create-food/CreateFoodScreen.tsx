@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { ClearOnFocusInput } from "../../components/ClearOnFocusInput";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
 import { useAddFoodLog } from "../../hooks/useFoodDiary";
 import {
@@ -329,9 +330,10 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("createFood.logAmountTitle")}</Text>
             <Text style={s.inputLabel}>{returnTo === "meal" || returnTo === "recipe" ? "Grams" : t("createFood.eatenGrams")}</Text>
-            <TextInput
+            <ClearOnFocusInput
               value={customGrams}
               onChangeText={setCustomGrams}
+              defaultValue="100"
               keyboardType="numeric"
               placeholder={t("createFood.logGramsPlaceholder")}
               placeholderTextColor="#9ca3af"
