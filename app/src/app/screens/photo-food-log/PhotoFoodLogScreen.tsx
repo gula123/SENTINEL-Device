@@ -58,6 +58,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
       const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
       if (!photo?.base64) throw new Error("No image data");
       setCapturedBase64(photo.base64);
+      setStage("reviewing");
       await runAnalysis(photo.base64, capturedMimeType, hint);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
@@ -92,7 +93,6 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
       grams: item.estimatedGrams,
     }));
     setItems(mapped);
-    setStage("reviewing");
     setAnalyzing(false);
   };
 
@@ -196,6 +196,8 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
               <Text style={s.captureBtnText}>{t("photoLog.analyze")}</Text>
             </Pressable>
           )}
+
+          <Text style={s.captureTip}>{t("photoLog.productTip")}</Text>
 
           <Pressable style={s.cancelBtnCapture} onPress={() => capturedBase64 ? setStage("reviewing") : navigation.goBack()}>
             <Text style={s.cancelBtnCaptureText}>{t("common.cancel")}</Text>
@@ -426,6 +428,12 @@ const s = StyleSheet.create({
   captureBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   cancelBtnCapture: { alignItems: "center", paddingVertical: 8 },
   cancelBtnCaptureText: { color: "rgba(255,255,255,0.6)", fontWeight: "600", fontSize: 14 },
+  captureTip: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  },
 
   // Review stage (light)
   safe: { flex: 1, backgroundColor: "#f8fdfb" },

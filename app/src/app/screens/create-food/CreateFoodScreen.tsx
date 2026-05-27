@@ -428,6 +428,12 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
               </View>
             )}
             <View style={ps.overlay} pointerEvents="none" />
+            {photoAnalyzing && (
+              <View style={ps.analyzingOverlay}>
+                <ActivityIndicator color="#16a34a" size="large" />
+                <Text style={ps.analyzingOverlayText}>{t("photoLog.analyzing")}</Text>
+              </View>
+            )}
             <KeyboardAvoidingView
               behavior={Platform.OS === "ios" ? "padding" : undefined}
               style={ps.bottom}
@@ -438,10 +444,13 @@ export default function CreateFoodScreen({ route, navigation }: Props) {
                   <Text style={ps.analyzingText}>{t("photoLog.analyzing")}</Text>
                 </View>
               ) : (
-                <Pressable style={ps.captureBtn} onPress={onPhotoCapture} disabled={!cameraPermission?.granted}>
-                  <Ionicons name="camera" size={24} color="#fff" />
-                  <Text style={ps.captureBtnText}>{t("createFood.analyzePhotoBtn")}</Text>
-                </Pressable>
+                <>
+                  <Pressable style={ps.captureBtn} onPress={onPhotoCapture} disabled={!cameraPermission?.granted}>
+                    <Ionicons name="camera" size={24} color="#fff" />
+                    <Text style={ps.captureBtnText}>{t("createFood.analyzePhotoBtn")}</Text>
+                  </Pressable>
+                  <Text style={ps.captureTip}>{t("photoLog.productTip")}</Text>
+                </>
               )}
               <Pressable style={ps.cancelBtn} onPress={() => setPhotoModalVisible(false)}>
                 <Text style={ps.cancelBtnText}>{t("common.cancel")}</Text>
@@ -651,6 +660,21 @@ const ps = StyleSheet.create({
   captureBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   analyzingRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14 },
   analyzingText: { color: "#d1fae5", fontWeight: "600" },
+  analyzingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.82)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    zIndex: 10,
+  },
+  analyzingOverlayText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  captureTip: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  },
   cancelBtn: { alignItems: "center", paddingVertical: 10 },
   cancelBtnText: { color: "#d1fae5", fontWeight: "600", fontSize: 15 },
   permissionBox: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
