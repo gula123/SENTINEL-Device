@@ -419,9 +419,8 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={s.headerTitle}>
             <Text style={s.headerIcon}>{MEAL_ICON[meal]}</Text>
-            <Text style={s.headerText}>{t("searchFood.title")}</Text>
+            <Text style={s.headerText}>{t("searchFood.title")} - {t(`home.${meal.toLowerCase()}`)}</Text>
           </View>
-          <Text style={s.headerDate}>{t(`home.${meal.toLowerCase()}`)}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
