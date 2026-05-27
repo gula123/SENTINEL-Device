@@ -26,7 +26,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   }, [navigation, recipe?.name]);
 
   return (
-    <SafeAreaView style={s.safe} edges={["top"]}>
+    <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

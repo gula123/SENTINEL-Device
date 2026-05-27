@@ -187,7 +187,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={["top"]}>
+    <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>

@@ -20,7 +20,7 @@ import {
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import type { MainStackParamList } from "../../navigation/navigationTypes";
@@ -102,6 +102,7 @@ type Props = NativeStackScreenProps<MainStackParamList, "LogFood">;
 
 export default function LogFoodScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
+  const insets = useSafeAreaInsets();
 
   const [query, setQuery] = useState("");
   const [grams, setGrams] = useState("100");
@@ -672,7 +673,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           <Text style={s.headerDate}>{dayjs(date).format("MMM D")}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 80 }]} keyboardShouldPersistTaps="handled">
 
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("logFood.cardTitle")}</Text>
@@ -815,7 +816,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
         </ScrollView>
 
-        <View style={s.footer}>
+        <View style={[s.footer, { bottom: insets.bottom }]}>
           <Pressable
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
@@ -830,6 +831,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           <Animated.View
             style={[
               s.toast,
+              { bottom: insets.bottom + 24 },
               {
                 opacity: toastAnim,
                 transform: [

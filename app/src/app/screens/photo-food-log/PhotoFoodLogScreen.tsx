@@ -6,13 +6,13 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,6 +34,7 @@ type Stage = "capture" | "reviewing" | "logging";
 
 export default function PhotoFoodLogScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
+  const insets = useSafeAreaInsets();
   const { token, signOut } = useAuth();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -180,7 +181,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={s.captureBottom}
+          style={[s.captureBottom, { bottom: insets.bottom }]}
         >
           {analyzing ? (
             <View style={s.analyzingRowCapture}>
@@ -209,7 +210,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
 
   // ── Review stage ───────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={s.safe} edges={["top"] as any}>
+    <SafeAreaView style={s.safe} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
@@ -284,7 +285,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
 
         <ScrollView
           style={s.list}
-          contentContainerStyle={s.listContent}
+          contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 130 }]}
           keyboardShouldPersistTaps="handled"
         >
           {items.length === 0 && !analyzing && (
@@ -327,7 +328,7 @@ export default function PhotoFoodLogScreen({ route, navigation }: Props) {
         </ScrollView>
 
         {/* Footer */}
-        <View style={s.footer}>
+        <View style={[s.footer, { bottom: insets.bottom }]}>
           <Pressable
             style={({ pressed }) => [s.retakeBtn, pressed && s.pressed]}
             onPress={() => { setStage("capture"); }}
