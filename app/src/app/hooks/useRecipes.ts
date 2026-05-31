@@ -31,6 +31,9 @@ export const useLogRecipe = (date: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["foodLogs", date] });
       queryClient.invalidateQueries({ queryKey: ["foodLogs", "month", yearMonth] });
+      queryClient.invalidateQueries({ queryKey: ["nutritionSummary", date] });
+      queryClient.invalidateQueries({ queryKey: ["diaryDay", date] });
+      queryClient.invalidateQueries({ queryKey: ["calendarData", yearMonth] });
     },
   });
 };

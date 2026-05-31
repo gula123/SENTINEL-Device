@@ -21,15 +21,16 @@ import { useCallback, useRef, useState } from "react";
 import {
   deleteRecipe,
   fetchMyRecipes,
-  logRecipe,
   type RecipeDto,
 } from "../../services/food/recipesApi";
+import { useLogRecipe } from "../../hooks/useRecipes";
 
 type Props = NativeStackScreenProps<MainStackParamList, "Recipes">;
 
 export default function RecipesScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
   const { token, signOut } = useAuth();
+  const logRecipeMutation = useLogRecipe(date);
   const [recipes, setRecipes] = useState<RecipeDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loggingRecipeId, setLoggingRecipeId] = useState<number | null>(null);
@@ -89,7 +90,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
 
     setLoggingRecipeId(recipe.id);
     try {
-      await logRecipe(token, { recipeId: recipe.id, grams, mealType: meal, logDate: date });
+      await logRecipeMutation.mutateAsync({ recipeId: recipe.id, grams, mealType: meal });
       showToast(`Logged ${recipe.name} (${grams}g)`);
       setGramsInput((prev) => ({ ...prev, [recipe.id]: "" }));
     } catch (err) {
