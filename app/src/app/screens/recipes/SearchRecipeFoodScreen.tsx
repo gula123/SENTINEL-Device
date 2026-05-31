@@ -76,9 +76,9 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
         if (!cancelled) setResults(foods.slice(0, 12));
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "Search failed";
+        const msg = err instanceof Error ? err.message : "Something went wrong";
         if (msg === "AUTH_EXPIRED") { signOut(); return; }
-        Alert.alert("Error", msg);
+        Alert.alert(t("common.error"), msg);
       } finally {
         if (!cancelled) setSearching(false);
       }
@@ -116,7 +116,7 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
   function handleError(err: unknown) {
     const msg = err instanceof Error ? err.message : "Something went wrong";
     if (msg === "AUTH_EXPIRED") { signOut(); return; }
-    Alert.alert("Error", msg);
+    Alert.alert(t("common.error"), msg);
   }
 
   async function handleBarcodeScanned(code: string) {
@@ -129,11 +129,11 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
         setQuery(result.name);
       } else {
         Alert.alert(
-          "Not found",
-          "This product is not in our database yet.",
+          t("searchFood.notFound"),
+          t("searchFood.notInDatabase"),
           [
-            { text: "Cancel", style: "cancel" },
-            { text: "Create this food", onPress: () => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "recipe", barcode: code }) },
+            { text: t("common.cancel"), style: "cancel" },
+            { text: t("searchFood.createThisFood"), onPress: () => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "recipe", barcode: code }) },
           ]
         );
       }
@@ -260,13 +260,13 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
                 ) : null}
                 {query.trim().length > 0 && !searching ? (
                   <View style={s.createFoodSection}>
-                    <Text style={s.createFoodLabel}>Can't find what you're looking for?</Text>
+                    <Text style={s.createFoodLabel}>{t("searchFood.cantFind")}</Text>
                     <Pressable
                       onPress={() => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "recipe" })}
                       style={({ pressed }) => [s.createFoodBtn, pressed && s.pressed]}
                     >
                       <Ionicons name="add-circle-outline" size={14} color="#16a34a" />
-                      <Text style={s.createFoodBtnText}>Create new food</Text>
+                      <Text style={s.createFoodBtnText}>{t("searchFood.createNewFood")}</Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -302,8 +302,8 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
               <View style={s.previewBox}>
                 <Text style={s.previewTitle}>
                   {selectedPortion
-                    ? `Will add (${portionAmount || "0"} x ${selectedPortion.portionName} = ${preview.grams}g)`
-                    : `Will add (${preview.grams}g)`}
+                    ? t("searchFood.willAddPortion").replace("{amount}", portionAmount || "0").replace("{portionName}", selectedPortion.portionName).replace("{grams}", String(preview.grams))
+                    : t("searchFood.willAdd").replace("{grams}", String(preview.grams))}
                 </Text>
                 <View style={s.previewRow}>
                   <Text style={s.previewItem}>🔥 {preview.calories} kcal</Text>
@@ -322,7 +322,7 @@ export default function SearchRecipeFoodScreen({ navigation, route }: Props) {
                     onChangeText={setPortionAmount}
                     defaultValue="1"
                     keyboardType="numeric"
-                    placeholder="Amount"
+                    placeholder={t("searchFood.amount")}
                     placeholderTextColor="#9ca3af"
                     style={[s.input, s.gramsInput]}
                     returnKeyType="done"

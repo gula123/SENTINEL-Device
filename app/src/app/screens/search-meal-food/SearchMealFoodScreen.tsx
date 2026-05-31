@@ -26,6 +26,7 @@ import {
   type PortionTypeDto,
 } from "../../services/food/foodLogsApi";
 import { useAuth } from "../../state/AuthContext";
+import { useLanguage } from "../../state/LanguageContext";
 import { setPendingMealFood } from "../../state/mealFoodPicker";
 import BarcodeScannerModal from "../../components/BarcodeScannerModal";
 
@@ -33,6 +34,7 @@ type Props = NativeStackScreenProps<MainStackParamList, "SearchMealFood">;
 
 export default function SearchMealFoodScreen({ navigation, route }: Props) {
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
 
   const [query, setQuery] = useState("");
   const [grams, setGrams] = useState("100");
@@ -74,9 +76,9 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
         if (!cancelled) setResults(foods.slice(0, 12));
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "Search failed";
+        const msg = err instanceof Error ? err.message : "Something went wrong";
         if (msg === "AUTH_EXPIRED") { signOut(); return; }
-        Alert.alert("Error", msg);
+        Alert.alert(t("common.error"), msg);
       } finally {
         if (!cancelled) setSearching(false);
       }
@@ -114,7 +116,7 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
   function handleError(err: unknown) {
     const msg = err instanceof Error ? err.message : "Something went wrong";
     if (msg === "AUTH_EXPIRED") { signOut(); return; }
-    Alert.alert("Error", msg);
+    Alert.alert(t("common.error"), msg);
   }
 
   async function handleBarcodeScanned(code: string) {
@@ -127,11 +129,11 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
         setQuery(result.name);
       } else {
         Alert.alert(
-          "Not found",
-          "This product is not in our database yet.",
+          t("searchFood.notFound"),
+          t("searchFood.notInDatabase"),
           [
-            { text: "Cancel", style: "cancel" },
-            { text: "Create this food", onPress: () => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "meal", barcode: code }) },
+            { text: t("common.cancel"), style: "cancel" },
+            { text: t("searchFood.createThisFood"), onPress: () => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "meal", barcode: code }) },
           ]
         );
       }
@@ -163,7 +165,7 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
   const onAdd = () => {
     if (!selectedFood) return;
     if (!Number.isFinite(resolvedGrams) || resolvedGrams <= 0) {
-      Alert.alert("Invalid grams", "Enter a positive number.");
+      Alert.alert(t("searchFood.invalidGrams"), t("searchFood.positiveNumber"));
       return;
     }
     setPendingMealFood(selectedFood, resolvedGrams);
@@ -199,12 +201,12 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
-          <Text style={s.headerText}>Search Food</Text>
+          <Text style={s.headerText}>{t("searchFood.title")}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
-            <Text style={s.cardTitle}>FOOD</Text>
+            <Text style={s.cardTitle}>{t("searchFood.cardTitle")}</Text>
 
             {selectedFood ? (
               <View style={s.selectedChip}>
@@ -224,7 +226,7 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
                   <TextInput
                     value={query}
                     onChangeText={onSearch}
-                    placeholder="Search foods..."
+                    placeholder={t("searchFood.placeholder")}
                     placeholderTextColor="#9ca3af"
                     style={[s.input, s.inputFlex]}
                     autoFocus
@@ -258,13 +260,13 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
                 ) : null}
                 {query.trim().length > 0 && !searching ? (
                   <View style={s.createFoodSection}>
-                    <Text style={s.createFoodLabel}>Can't find what you're looking for?</Text>
+                    <Text style={s.createFoodLabel}>{t("searchFood.cantFind")}</Text>
                     <Pressable
                       onPress={() => navigation.navigate("CreateFood", { meal: route.params.meal, date: route.params.date, returnTo: "meal" })}
                       style={({ pressed }) => [s.createFoodBtn, pressed && s.pressed]}
                     >
                       <Ionicons name="add-circle-outline" size={14} color="#16a34a" />
-                      <Text style={s.createFoodBtnText}>Create new food</Text>
+                      <Text style={s.createFoodBtnText}>{t("searchFood.createNewFood")}</Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -273,13 +275,13 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
 
             {selectedFood && portions.length > 0 ? (
               <View style={s.portionWrap}>
-                <Text style={s.portionLabel}>Portions</Text>
+                <Text style={s.portionLabel}>{t("searchFood.portions")}</Text>
                 <View style={s.portionRow}>
                   <Pressable
                     onPress={() => { setSelectedPortionId(null); setPortionAmount("1"); }}
                     style={({ pressed }) => [s.portionChip, selectedPortionId === null && s.portionChipActive, pressed && s.pressed]}
                   >
-                    <Text style={[s.portionChipText, selectedPortionId === null && s.portionChipTextActive]}>Grams</Text>
+                    <Text style={[s.portionChipText, selectedPortionId === null && s.portionChipTextActive]}>{t("searchFood.gramChip")}</Text>
                   </Pressable>
                   {portions.map((portion) => (
                     <Pressable
@@ -300,8 +302,8 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
               <View style={s.previewBox}>
                 <Text style={s.previewTitle}>
                   {selectedPortion
-                    ? `Will add (${portionAmount || "0"} x ${selectedPortion.portionName} = ${preview.grams}g)`
-                    : `Will add (${preview.grams}g)`}
+                    ? t("searchFood.willAddPortion").replace("{amount}", portionAmount || "0").replace("{portionName}", selectedPortion.portionName).replace("{grams}", String(preview.grams))
+                    : t("searchFood.willAdd").replace("{grams}", String(preview.grams))}
                 </Text>
                 <View style={s.previewRow}>
                   <Text style={s.previewItem}>🔥 {preview.calories} kcal</Text>
@@ -320,7 +322,7 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
                     onChangeText={setPortionAmount}
                     defaultValue="1"
                     keyboardType="numeric"
-                    placeholder="Amount"
+                    placeholder={t("searchFood.amount")}
                     placeholderTextColor="#9ca3af"
                     style={[s.input, s.gramsInput]}
                     returnKeyType="done"
@@ -331,14 +333,14 @@ export default function SearchMealFoodScreen({ navigation, route }: Props) {
                     onChangeText={setGrams}
                     defaultValue="100"
                     keyboardType="numeric"
-                    placeholder="Grams"
+                    placeholder={t("searchFood.grams")}
                     placeholderTextColor="#9ca3af"
                     style={[s.input, s.gramsInput]}
                     returnKeyType="done"
                   />
                 )}
                 <Pressable onPress={onAdd} style={({ pressed }) => [s.addBtn, pressed && s.pressed]}>
-                  <Text style={s.addBtnText}>Add</Text>
+                  <Text style={s.addBtnText}>{t("searchFood.add")}</Text>
                 </Pressable>
               </View>
             ) : null}

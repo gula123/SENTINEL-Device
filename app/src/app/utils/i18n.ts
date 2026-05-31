@@ -330,6 +330,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "searchFood.willAdd": "Will add ({grams}g)",
     "searchFood.ingredientsFinalWeight": "Ingredients · Final weight: {weight}",
     "searchFood.modifyRecipe": "Modify this recipe",
+    "searchFood.notFound": "Not found",
+    "searchFood.notInDatabase": "This product is not in our database yet.",
+    "searchFood.createThisFood": "Create this food",
+    "searchFood.cantFind": "Can't find what you're looking for?",
+    "searchFood.createNewFood": "Create new food",
+    "searchFood.willAddPortion": "Will add ({amount} x {portionName} = {grams}g)",
 
     // Add Food
     "addFood.title": "Add Food",
@@ -366,6 +372,15 @@ export const translations: Record<Language, Record<string, string>> = {
     "meals.save": "Save Meal",
     "meals.saving": "Saving...",
     "meals.gramsLabel": "g",
+    "meals.foodAddedToast": "{name} added to meal",
+    "meals.totalsHint": "Current meal totals",
+    "meals.nameRequired": "Name required",
+    "meals.nameRequiredMsg": "Please enter a name for this meal.",
+    "meals.noFoods": "No foods",
+    "meals.noFoodsMsg": "Please add at least one food to this meal.",
+    "meals.editGramsError": "Please enter valid grams",
+    "meals.directGramsMode": "Direct grams mode",
+    "meals.preview": "Preview ({grams}g)",
 
     // Create Food
     "createFood.title": "Create Food",
@@ -544,6 +559,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "recipes.invalid": "Invalid",
     "recipes.gramsMode": "Grams",
     "recipes.portionMode": "Portion",
+    "recipes.createNewRecipe": "Create New Recipe",
+    "recipes.myRecipes": "My Recipes",
+    "recipes.copiedRecipes": "Copied from others",
+    "recipes.createFirstHint": "Create your first recipe above.",
+    "recipes.loggedToast": "Logged {name} ({grams}g)",
+    "recipes.deleted": "Recipe deleted",
 
     // Progress (missing)
     "progress.vacation": "Vacation",
@@ -882,6 +903,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "searchFood.willAdd": "Hozzáadás ({grams}g)",
     "searchFood.ingredientsFinalWeight": "Hozzávalók · Végleges súly: {weight}",
     "searchFood.modifyRecipe": "Recept módosítása",
+    "searchFood.notFound": "Nem található",
+    "searchFood.notInDatabase": "Ez a termék még nem szerepel az adatbázisunkban.",
+    "searchFood.createThisFood": "Étel létrehozása",
+    "searchFood.cantFind": "Nem találja, amit keres?",
+    "searchFood.createNewFood": "Új étel létrehozása",
+    "searchFood.willAddPortion": "Hozzáadás ({amount} x {portionName} = {grams}g)",
 
     // Étel hozzáadása
     "addFood.title": "Étel hozzáadása",
@@ -918,6 +945,15 @@ export const translations: Record<Language, Record<string, string>> = {
     "meals.save": "Étkezés mentése",
     "meals.saving": "Mentés...",
     "meals.gramsLabel": "g",
+    "meals.foodAddedToast": "{name} hozzáadva az étkezéshez",
+    "meals.totalsHint": "Aktuális étkezési összesítő",
+    "meals.nameRequired": "Név szükséges",
+    "meals.nameRequiredMsg": "Kérjük, adjon meg nevet ennek az étkezésnek.",
+    "meals.noFoods": "Nincs étel",
+    "meals.noFoodsMsg": "Kérjük, adjon hozzá legalább egy ételt ehhez az étkezéshez.",
+    "meals.editGramsError": "Kérjük, adjon meg érvényes grammot.",
+    "meals.directGramsMode": "Közvetlen gramm mód",
+    "meals.preview": "Előnézet ({grams}g)",
 
     // Étel létrehozása
     "createFood.title": "Étel létrehozása",
@@ -1096,6 +1132,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "recipes.invalid": "Érvénytelen",
     "recipes.gramsMode": "Gramm",
     "recipes.portionMode": "Adag",
+    "recipes.createNewRecipe": "Új recept létrehozása",
+    "recipes.myRecipes": "Saját receptjeim",
+    "recipes.copiedRecipes": "Másoktól átvett",
+    "recipes.createFirstHint": "Hozd létre az első receptedet fent.",
+    "recipes.loggedToast": "Naplózva: {name} ({grams}g)",
+    "recipes.deleted": "Recept törölve",
 
     // Fejlődés (hiányzó)
     "progress.vacation": "Szabadság",

@@ -138,7 +138,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
       const pending = consumePendingMealFood();
       if (pending) {
         handleAddFood(pending.food, pending.grams);
-        showToast(`${pending.food.name} added to meal`);
+        showToast(t("meals.foodAddedToast").replace("{name}", pending.food.name));
       }
     }, [handleAddFood])
   );
@@ -170,7 +170,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
     if (editingItemIndex === null) return;
     const g = editingResolvedGrams;
     if (!Number.isFinite(g) || g <= 0) {
-      Alert.alert("Error", "Please enter valid grams");
+      Alert.alert(t("common.error"), t("meals.editGramsError"));
       return;
     }
 
@@ -218,11 +218,11 @@ export default function MealDetailScreen({ route, navigation }: Props) {
 
   const handleSave = async () => {
     if (!mealName.trim()) {
-      Alert.alert("Name required", "Please enter a name for this meal.");
+      Alert.alert(t("meals.nameRequired"), t("meals.nameRequiredMsg"));
       return;
     }
     if (items.length === 0) {
-      Alert.alert("No foods", "Please add at least one food to this meal.");
+      Alert.alert(t("meals.noFoods"), t("meals.noFoodsMsg"));
       return;
     }
 
@@ -244,7 +244,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
       if (msg === "AUTH_EXPIRED") { signOut(); return; }
-      Alert.alert("Error", msg);
+      Alert.alert(t("common.error"), msg);
     }
   };
 
@@ -261,7 +261,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
           signOut();
           return;
         }
-        Alert.alert("Error", msg);
+        Alert.alert(t("common.error"), msg);
       }
     };
 
@@ -275,7 +275,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
       t("addFood.confirmDeleteMeal"),
       t("addFood.confirmDeleteMealMsg"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
           text: t("addFood.deleteMeal"),
           style: "destructive",
@@ -305,7 +305,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("logFood.cardTitle")}</Text>
-            <Text style={s.mealHint}>Current meal totals</Text>
+            <Text style={s.mealHint}>{t("meals.totalsHint")}</Text>
             <View style={s.metricsGrid}>
               <View style={s.metricBoxCompact}>
                 <Text style={s.metricLabel}>{t("logFood.calories")}</Text>
@@ -412,7 +412,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
                                   onPress={() => setEditingSelectedPortionId(null)}
                                   style={[s.portionChip, editingSelectedPortionId === null && s.portionChipActive]}
                                 >
-                                  <Text style={[s.portionChipText, editingSelectedPortionId === null && s.portionChipTextActive]}>Grams</Text>
+                                  <Text style={[s.portionChipText, editingSelectedPortionId === null && s.portionChipTextActive]}>{t("searchFood.gramChip")}</Text>
                                 </Pressable>
                                 {(portionsByFoodId[item.foodId] || []).slice(0, 5).map((portion) => (
                                   <Pressable
@@ -437,7 +437,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
                                 onChangeText={setEditingPortionAmount}
                                 keyboardType="numeric"
                                 returnKeyType="done"
-                                placeholder="Amount"
+                                placeholder={t("searchFood.amount")}
                                 placeholderTextColor="#9ca3af"
                               />
                             ) : (
@@ -447,7 +447,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
                                 onChangeText={setEditingGrams}
                                 keyboardType="numeric"
                                 returnKeyType="done"
-                                placeholder="Grams"
+                                placeholder={t("searchFood.grams")}
                                 placeholderTextColor="#9ca3af"
                               />
                             )}
@@ -462,7 +462,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
 
                           {editingPreview ? (
                             <View style={s.previewBox}>
-                              <Text style={s.previewTitle}>Preview ({Math.round(editingPreview.grams * 10) / 10}g)</Text>
+                              <Text style={s.previewTitle}>{t("meals.preview").replace("{grams}", String(Math.round(editingPreview.grams * 10) / 10))}</Text>
                               <View style={s.previewRow}>
                                 <Text style={s.previewItem}>🔥 {editingPreview.calories} kcal</Text>
                                 <Text style={s.previewItem}>🥩 {editingPreview.protein}g P</Text>
@@ -477,7 +477,7 @@ export default function MealDetailScreen({ route, navigation }: Props) {
                               1 {editingSelectedPortion.portionName} = {Math.round(editingSelectedPortion.grams * 10) / 10}g
                             </Text>
                           ) : (
-                            <Text style={s.helper}>Direct grams mode</Text>
+                            <Text style={s.helper}>{t("meals.directGramsMode")}</Text>
                           )}
                         </View>
                       ) : null}

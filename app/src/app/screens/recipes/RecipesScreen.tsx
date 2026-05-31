@@ -24,12 +24,14 @@ import {
   type RecipeDto,
 } from "../../services/food/recipesApi";
 import { useLogRecipe } from "../../hooks/useRecipes";
+import { useLanguage } from "../../state/LanguageContext";
 
 type Props = NativeStackScreenProps<MainStackParamList, "Recipes">;
 
 export default function RecipesScreen({ route, navigation }: Props) {
   const { meal, date } = route.params;
   const { token, signOut } = useAuth();
+  const { t } = useLanguage();
   const logRecipeMutation = useLogRecipe(date);
   const [recipes, setRecipes] = useState<RecipeDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +78,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
       signOut();
       return;
     }
-    Alert.alert("Error", msg);
+    Alert.alert(t("common.error"), msg);
   };
 
   const onLog = async (recipe: RecipeDto) => {
@@ -84,14 +86,14 @@ export default function RecipesScreen({ route, navigation }: Props) {
     const gramsStr = gramsInput[recipe.id] ?? String(recipe.finalCookedWeightG ?? "");
     const grams = parseFloat(gramsStr);
     if (!gramsStr || isNaN(grams) || grams <= 0) {
-      Alert.alert("Enter grams", "Please enter how many grams you ate.");
+      Alert.alert(t("recipes.enterGrams"), t("recipes.enterGramsMsg"));
       return;
     }
 
     setLoggingRecipeId(recipe.id);
     try {
       await logRecipeMutation.mutateAsync({ recipeId: recipe.id, grams, mealType: meal });
-      showToast(`Logged ${recipe.name} (${grams}g)`);
+      showToast(t("recipes.loggedToast").replace("{name}", recipe.name).replace("{grams}", String(grams)));
       setGramsInput((prev) => ({ ...prev, [recipe.id]: "" }));
     } catch (err) {
       handleError(err);
@@ -101,17 +103,17 @@ export default function RecipesScreen({ route, navigation }: Props) {
   };
 
   const onDelete = (recipe: RecipeDto) => {
-    Alert.alert("Delete Recipe", `Delete "${recipe.name}"? This cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("recipes.deleteConfirmTitle"), t("recipes.deleteConfirmMessage").replace("{name}", recipe.name), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("common.delete"),
         style: "destructive",
         onPress: async () => {
           if (!token) return;
           try {
             await deleteRecipe(token, recipe.id);
             setRecipes((prev) => prev.filter((r) => r.id !== recipe.id));
-            showToast("Recipe deleted");
+            showToast(t("recipes.deleted"));
           } catch (err) {
             handleError(err);
           }
@@ -131,7 +133,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Ionicons name="chevron-back" size={20} color="#374151" />
           </Pressable>
-          <Text style={s.headerText}>🍳 Recipes</Text>
+          <Text style={s.headerText}>🍳 {t("recipes.title")}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
@@ -145,18 +147,18 @@ export default function RecipesScreen({ route, navigation }: Props) {
                 style={({ pressed }) => [s.createBtn, pressed && s.pressed]}
               >
                 <Ionicons name="add-circle-outline" size={20} color="#16a34a" />
-                <Text style={s.createBtnText}>Create New Recipe</Text>
+                <Text style={s.createBtnText}>{t("recipes.createNewRecipe")}</Text>
               </Pressable>
 
               {/* My Recipes */}
               <View style={s.sectionHeader}>
-                <Text style={s.sectionTitle}>My Recipes</Text>
+                <Text style={s.sectionTitle}>{t("recipes.myRecipes")}</Text>
                 <Text style={s.sectionCount}>{myRecipes.length}</Text>
               </View>
               {myRecipes.length === 0 ? (
                 <View style={s.emptyCard}>
-                  <Text style={s.emptyText}>No recipes yet.</Text>
-                  <Text style={s.emptySubtext}>Create your first recipe above.</Text>
+                  <Text style={s.emptyText}>{t("recipes.noRecipes")}</Text>
+                  <Text style={s.emptySubtext}>{t("recipes.createFirstHint")}</Text>
                 </View>
               ) : (
                 myRecipes.map((recipe) => (
@@ -179,7 +181,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
               {copiedRecipes.length > 0 && (
                 <>
                   <View style={[s.sectionHeader, { marginTop: 8 }]}>
-                    <Text style={s.sectionTitle}>Copied from others</Text>
+                    <Text style={s.sectionTitle}>{t("recipes.copiedRecipes")}</Text>
                     <Text style={s.sectionCount}>{copiedRecipes.length}</Text>
                   </View>
                   {copiedRecipes.map((recipe) => (
