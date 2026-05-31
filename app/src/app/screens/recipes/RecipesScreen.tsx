@@ -125,7 +125,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {/* Header */}
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
@@ -134,7 +134,7 @@ export default function RecipesScreen({ route, navigation }: Props) {
           <Text style={s.headerText}>🍳 Recipes</Text>
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           {isLoading ? (
             <ActivityIndicator size="large" color="#16a34a" style={{ marginTop: 40 }} />
           ) : (

@@ -188,7 +188,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
             <Ionicons name="chevron-back" size={20} color="#374151" />
@@ -199,7 +199,7 @@ export default function AddFoodScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           {mealLogs.length > 0 && (
             <Pressable
               style={({ pressed }) => [s.loggedCard, pressed && s.pressed]}

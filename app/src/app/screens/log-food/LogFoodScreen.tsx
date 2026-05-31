@@ -660,7 +660,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {/* Header */}
         <View style={s.header}>
           <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => [s.backBtn, pressed && s.pressed]}>
@@ -673,7 +673,7 @@ export default function LogFoodScreen({ route, navigation }: Props) {
           <Text style={s.headerDate}>{dayjs(date).format("MMM D")}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 80 }]} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 80 }]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
 
           <View style={s.card}>
             <Text style={s.cardTitle}>{t("logFood.cardTitle")}</Text>
