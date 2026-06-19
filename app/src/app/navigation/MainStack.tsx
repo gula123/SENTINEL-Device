@@ -10,6 +10,7 @@ import PhotoFoodLogScreen from "../screens/photo-food-log/PhotoFoodLogScreen";
 import MealDetailScreen from "../screens/meal-detail/MealDetailScreen";
 import HabitInsightsScreen from "../screens/habits/HabitInsightsScreen";
 import CreateRecipeScreen from "../screens/recipes/CreateRecipeScreen";
+import FoodDetailScreen from "../screens/food-detail/FoodDetailScreen";
 import type { MainStackParamList } from "./navigationTypes";
 
 export type { MainStackParamList };
@@ -69,6 +70,11 @@ export default function MainStack() {
         <Stack.Screen
           name="RecipeDetail"
           component={CreateRecipeScreen}
+          options={{ presentation: "modal", headerShown: false }}
+        />
+        <Stack.Screen
+          name="FoodDetail"
+          component={FoodDetailScreen}
           options={{ presentation: "modal", headerShown: false }}
         />
     </Stack.Navigator>

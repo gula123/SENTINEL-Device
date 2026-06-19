@@ -1,5 +1,6 @@
 import type { MealType } from "../services/food/foodLogsApi";
 import type { RecipeDto } from "../services/food/recipesApi";
+import type { FoodItem } from "../services/food/foodLogsApi";
 
 export type MainStackParamList = {
   Tabs: undefined;
@@ -14,4 +15,5 @@ export type MainStackParamList = {
   HabitInsights: { habitId: number; habitName: string };
   CreateRecipe: { meal: MealType; date: string; recipe?: RecipeDto; isCopy?: boolean };
   RecipeDetail: { meal: MealType; date: string; recipe: RecipeDto };
+  FoodDetail: { food: FoodItem };
 };

@@ -548,6 +548,16 @@ export default function SearchFoodScreen({ route, navigation }: Props) {
                           {item.brandOrPlace ? <Text style={s.resultSubmeta}>{item.brandOrPlace}</Text> : null}
                         </View>
                         <Text style={s.resultMeta}>{Math.round(item.calories)} kcal/100g</Text>
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            navigation.navigate("FoodDetail", { food: item });
+                          }}
+                          style={({ pressed }) => [s.detailBtn, pressed && s.pressed]}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons name="information-circle-outline" size={18} color="#9ca3af" />
+                        </Pressable>
                       </Pressable>
                     ))}
                     {recipeResults.map((recipe) => (
@@ -944,6 +954,7 @@ const s = StyleSheet.create({
   resultName: { fontSize: 13, color: "#111827" },
   resultSubmeta: { fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: "500" },
   resultMeta: { fontSize: 12, color: "#9ca3af" },
+  detailBtn: { padding: 4, marginLeft: 4 },
 
   selectedChip: {
     flexDirection: "row",

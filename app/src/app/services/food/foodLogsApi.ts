@@ -411,3 +411,85 @@ export const removeFavoriteFood = async (token: string, foodId: number): Promise
     throw new Error(`Failed to remove favorite food (${response.status})`);
   }
 };
+
+// ─── Crowd maintenance ────────────────────────────────────────────────────────
+
+export interface FoodValueCandidate {
+  id: number;
+  foodId: number;
+  isOriginal: boolean;
+  proposedBy: number | null;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatsPer100g: number;
+  voteCount: number;
+  currentUserVoted: boolean;
+}
+
+export const getFoodCandidates = async (token: string, foodId: number): Promise<FoodValueCandidate[]> => {
+  const response = await authenticatedFetch(`/food/${foodId}/candidates`, token);
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to fetch candidates (${response.status})`);
+  }
+  return response.json();
+};
+
+export const submitCorrection = async (
+  token: string,
+  foodId: number,
+  macros: { caloriesPer100g: number; proteinPer100g: number; carbsPer100g: number; fatsPer100g: number }
+): Promise<FoodValueCandidate[]> => {
+  const response = await authenticatedFetch(`/food/${foodId}/corrections`, token, {
+    method: "POST",
+    body: JSON.stringify(macros),
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to submit correction (${response.status})`);
+  }
+  return response.json();
+};
+
+export const voteForCandidate = async (
+  token: string,
+  foodId: number,
+  candidateId: number
+): Promise<FoodValueCandidate[]> => {
+  const response = await authenticatedFetch(`/food/${foodId}/candidates/${candidateId}/vote`, token, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to cast vote (${response.status})`);
+  }
+  return response.json();
+};
+
+export const voteForOriginal = async (token: string, foodId: number): Promise<FoodValueCandidate[]> => {
+  const response = await authenticatedFetch(`/food/${foodId}/vote-original`, token, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to cast vote (${response.status})`);
+  }
+  return response.json();
+};
+
+export const submitDuplicateReport = async (
+  token: string,
+  duplicateFoodId: number,
+  canonicalFoodId: number,
+  notes?: string
+): Promise<void> => {
+  const response = await authenticatedFetch(`/food/duplicate-reports`, token, {
+    method: "POST",
+    body: JSON.stringify({ duplicateFoodId, canonicalFoodId, notes }),
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("AUTH_EXPIRED");
+    throw new Error(`Failed to submit report (${response.status})`);
+  }
+};
